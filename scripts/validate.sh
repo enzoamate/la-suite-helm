@@ -7,10 +7,16 @@ REQUIRE_KUBECONFORM="${REQUIRE_KUBECONFORM:-false}"
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 
+export HELM_REPOSITORY_CONFIG="$TMP_DIR/repositories.yaml"
+export HELM_REPOSITORY_CACHE="$TMP_DIR/repository-cache"
+
 command -v helm >/dev/null 2>&1 || {
   echo "Erreur : Helm 3 est requis." >&2
   exit 1
 }
+
+helm repo add suite-docs https://suitenumerique.github.io/docs/ >/dev/null
+helm repo add suite-drive https://suitenumerique.github.io/drive/ >/dev/null
 
 if command -v jq >/dev/null 2>&1; then
   while IFS= read -r schema; do

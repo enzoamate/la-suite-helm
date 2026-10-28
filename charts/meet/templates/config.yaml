@@ -1,0 +1,82 @@
+{{- if .Values.serviceAccount.create }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "meet.serviceAccountName" . }}
+  labels:
+    {{- include "meet.labels" . | nindent 4 }}
+  {{- with .Values.serviceAccount.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+automountServiceAccountToken: {{ .Values.serviceAccount.automountServiceAccountToken }}
+---
+{{- end }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "meet.fullname" . }}-config
+  labels:
+    {{- include "meet.labels" . | nindent 4 }}
+data:
+  DJANGO_CONFIGURATION: {{ .Values.application.djangoConfiguration | quote }}
+  DJANGO_SETTINGS_MODULE: meet.settings
+  DJANGO_ALLOWED_HOSTS: {{ .Values.domain | quote }}
+  DJANGO_CSRF_TRUSTED_ORIGINS: {{ printf "https://%s" .Values.domain | quote }}
+  DJANGO_LOG_LEVEL: {{ .Values.application.logLevel | quote }}
+  DB_HOST: {{ include "meet.postgresqlHost" . | quote }}
+  DB_NAME: {{ include "meet.postgresqlDatabase" . | quote }}
+  DB_USER: {{ include "meet.postgresqlUser" . | quote }}
+  DB_PORT: {{ include "meet.postgresqlPort" . | quote }}
+  REDIS_URL: {{ include "meet.redisUrl" . | quote }}
+  CELERY_BROKER_URL: {{ include "meet.celeryBrokerUrl" . | quote }}
+  CELERY_ENABLED: "true"
+  LIVEKIT_API_URL: {{ include "meet.livekitEndpoint" . | quote }}
+  ALLOW_UNREGISTERED_ROOMS: {{ .Values.application.allowUnregisteredRooms | quote }}
+  RECORDING_ENABLE: {{ .Values.advanced.recording.enabled | quote }}
+  {{- if .Values.oidc.enabled }}
+  OIDC_OP_URL: {{ .Values.oidc.issuerUrl | quote }}
+  OIDC_OP_AUTHORIZATION_ENDPOINT: {{ .Values.oidc.authorizationEndpoint | quote }}
+  OIDC_OP_TOKEN_ENDPOINT: {{ .Values.oidc.tokenEndpoint | quote }}
+  OIDC_OP_USER_ENDPOINT: {{ .Values.oidc.userEndpoint | quote }}
+  OIDC_OP_JWKS_ENDPOINT: {{ .Values.oidc.jwksEndpoint | quote }}
+  OIDC_OP_LOGOUT_ENDPOINT: {{ .Values.oidc.logoutEndpoint | quote }}
+  OIDC_RP_CLIENT_ID: {{ .Values.oidc.clientId | quote }}
+  OIDC_RP_SIGN_ALGO: {{ .Values.oidc.signAlgorithm | quote }}
+  OIDC_RP_SCOPES: {{ .Values.oidc.scopes | quote }}
+  OIDC_VERIFY_SSL: {{ .Values.oidc.verifySSL | quote }}
+  OIDC_USE_PKCE: {{ .Values.oidc.usePKCE | quote }}
+  OIDC_AUTH_REQUEST_EXTRA_PARAMS: {{ .Values.oidc.extraAuthParams | quote }}
+  OIDC_REDIRECT_ALLOWED_HOSTS: {{ printf "https://%s" .Values.domain | quote }}
+  LOGIN_REDIRECT_URL: {{ printf "https://%s" .Values.domain | quote }}
+  LOGIN_REDIRECT_URL_FAILURE: {{ printf "https://%s" .Values.domain | quote }}
+  LOGOUT_REDIRECT_URL: {{ printf "https://%s" .Values.domain | quote }}
+  {{- end }}
+  {{- if .Values.smtp.enabled }}
+  DJANGO_EMAIL_HOST: {{ .Values.smtp.host | quote }}
+  DJANGO_EMAIL_PORT: {{ .Values.smtp.port | quote }}
+  DJANGO_EMAIL_HOST_USER: {{ .Values.smtp.username | quote }}
+  DJANGO_EMAIL_FROM: {{ .Values.smtp.from | quote }}
+  DJANGO_EMAIL_USE_TLS: {{ .Values.smtp.useTLS | quote }}
+  DJANGO_EMAIL_USE_SSL: {{ .Values.smtp.useSSL | quote }}
+  {{- end }}
+  {{- if .Values.media.enabled }}
+  AWS_S3_ENDPOINT_URL: {{ .Values.media.endpoint | quote }}
+  {{- with .Values.media.publicEndpoint }}
+  AWS_S3_DOMAIN_REPLACE: {{ . | quote }}
+  {{- end }}
+  AWS_STORAGE_BUCKET_NAME: {{ .Values.media.bucket | quote }}
+  AWS_S3_REGION_NAME: {{ .Values.media.region | quote }}
+  AWS_S3_SIGNATURE_VERSION: {{ .Values.media.signatureVersion | quote }}
+  FILE_UPLOAD_ENABLED: {{ .Values.media.fileUploadEnabled | quote }}
+  {{- end }}
+  {{- if .Values.advanced.transcription.enabled }}
+  FRONTEND_TRANSCRIPTION_DESTINATION: {{ .Values.advanced.transcription.destination | quote }}
+  {{- end }}
+  {{- if .Values.advanced.summary.enabled }}
+  SUMMARY_SERVICE_ENDPOINT: {{ .Values.advanced.summary.endpoint | quote }}
+  SUMMARY_SERVICE_VERSION: {{ .Values.advanced.summary.version | quote }}
+  {{- end }}
+  {{- range $name, $value := .Values.application.extraEnv }}
+  {{ $name }}: {{ $value | quote }}
+  {{- end }}

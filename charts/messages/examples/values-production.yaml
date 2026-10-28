@@ -1,0 +1,78 @@
+host: mail.example.org
+technicalDomain: msg.example.org
+existingSecret: messages-production-secrets
+
+secretKeys:
+  s3ImportsAccessKey: S3_IMPORTS_ACCESS_KEY
+  s3ImportsSecretKey: S3_IMPORTS_SECRET_KEY
+  s3BlobsAccessKey: S3_BLOBS_ACCESS_KEY
+  s3BlobsSecretKey: S3_BLOBS_SECRET_KEY
+
+oidc:
+  enabled: true
+  authorizationEndpoint: https://identity.example.org/realms/services/protocol/openid-connect/auth
+  tokenEndpoint: https://identity.example.org/realms/services/protocol/openid-connect/token
+  userEndpoint: https://identity.example.org/realms/services/protocol/openid-connect/userinfo
+  jwksEndpoint: https://identity.example.org/realms/services/protocol/openid-connect/certs
+  logoutEndpoint: https://identity.example.org/realms/services/protocol/openid-connect/logout
+  clientId: messages
+
+smtp:
+  enabled: true
+  relayHost: smtp.example.org
+  relayPort: 587
+  username: messages
+
+postgresql:
+  mode: external
+  external:
+    host: postgresql.example.org
+    database: messages
+    user: messages
+    port: 5432
+
+redis:
+  mode: external
+  external:
+    url: redis://redis.example.org:6379/0
+    celeryBrokerUrl: redis://redis.example.org:6379/1
+
+opensearch:
+  mode: external
+  external:
+    url: https://opensearch.example.org
+
+s3:
+  mode: external
+  region: eu-west-1
+  external:
+    importsEndpoint: https://objects.example.org
+    blobsEndpoint: https://objects.example.org
+  imports:
+    bucket: messages-imports
+  blobs:
+    bucket: messages-blobs
+
+backend:
+  replicas: 2
+
+frontend:
+  replicas: 2
+  trustedProxies: 192.0.2.0/24
+
+worker:
+  replicas: 1
+  concurrency: 8
+
+mta:
+  enabled: false
+
+routing:
+  type: ingress
+  ingress:
+    className: nginx
+    annotations:
+      nginx.ingress.kubernetes.io/proxy-body-size: 100m
+    tls:
+      enabled: true
+      secretName: messages-web-tls

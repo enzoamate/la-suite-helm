@@ -1,0 +1,201 @@
+{{- if .Values.mta.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "messages.fullname" . }}-mta
+  labels:
+    {{- include "messages.labels" . | nindent 4 }}
+    app.kubernetes.io/component: mta
+  {{- with .Values.mta.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.mta.service.type }}
+  externalTrafficPolicy: {{ .Values.mta.service.externalTrafficPolicy }}
+  {{- with .Values.mta.service.loadBalancerIP }}
+  loadBalancerIP: {{ . | quote }}
+  {{- end }}
+  selector:
+    {{- include "messages.selectorLabels" (dict "root" . "component" "mta") | nindent 4 }}
+  ports:
+    - name: smtp
+      port: {{ .Values.mta.service.port }}
+      targetPort: smtp
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "messages.fullname" . }}-mta
+  labels:
+    {{- include "messages.labels" . | nindent 4 }}
+    app.kubernetes.io/component: mta
+spec:
+  replicas: {{ .Values.mta.replicas }}
+  selector:
+    matchLabels:
+      {{- include "messages.selectorLabels" (dict "root" . "component" "mta") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "messages.selectorLabels" (dict "root" . "component" "mta") | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "messages.serviceAccountName" . }}
+      automountServiceAccountToken: {{ .Values.serviceAccount.automountServiceAccountToken }}
+      securityContext:
+        {{- toYaml .Values.mta.podSecurityContext | nindent 8 }}
+      containers:
+        - name: mta
+          image: {{ include "messages.image" .Values.images.mta | quote }}
+          imagePullPolicy: {{ .Values.images.mta.pullPolicy }}
+          env:
+            - name: MDA_API_BASE_URL
+              value: {{ printf "http://%s-backend:%v/api/v1.0/" (include "messages.fullname" .) .Values.backend.service.port | quote }}
+            - name: MDA_API_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "messages.secretName" . }}
+                  key: {{ .Values.secretKeys.mdaApiSecret }}
+            - name: PYMTA_SMTP_BIND_HOST
+              value: 0.0.0.0
+            - name: PYMTA_SMTP_BIND_PORT
+              value: "2525"
+            - name: PYMTA_SMTP_HOSTNAME
+              value: {{ .Values.mta.hostname | quote }}
+            {{- if .Values.mta.tls.enabled }}
+            - name: PYMTA_TLS_CERT_FILE
+              value: /tls/tls.crt
+            - name: PYMTA_TLS_KEY_FILE
+              value: /tls/tls.key
+            {{- end }}
+          ports:
+            - name: smtp
+              containerPort: 2525
+          readinessProbe:
+            tcpSocket:
+              port: smtp
+            {{- toYaml .Values.mta.probes.readiness | nindent 12 }}
+          livenessProbe:
+            tcpSocket:
+              port: smtp
+            {{- toYaml .Values.mta.probes.liveness | nindent 12 }}
+          resources:
+            {{- toYaml .Values.mta.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.mta.securityContext | nindent 12 }}
+          {{- if .Values.mta.tls.enabled }}
+          volumeMounts:
+            - name: tls
+              mountPath: /tls
+              readOnly: true
+          {{- end }}
+      {{- if .Values.mta.tls.enabled }}
+      volumes:
+        - name: tls
+          secret:
+            secretName: {{ .Values.mta.tls.secretName | quote }}
+      {{- end }}
+{{- end }}
+{{- if .Values.network.metallb.enabled }}
+---
+apiVersion: {{ .Values.network.metallb.apiVersion }}
+kind: IPAddressPool
+metadata:
+  name: {{ include "messages.fullname" . }}
+  namespace: {{ .Values.network.metallb.namespace }}
+  labels:
+    {{- include "messages.labels" . | nindent 4 }}
+spec:
+  addresses:
+    {{- toYaml .Values.network.metallb.addresses | nindent 4 }}
+  autoAssign: {{ .Values.network.metallb.autoAssign }}
+{{- if .Values.network.metallb.l2Advertisement.enabled }}
+---
+apiVersion: {{ .Values.network.metallb.apiVersion }}
+kind: L2Advertisement
+metadata:
+  name: {{ include "messages.fullname" . }}
+  namespace: {{ .Values.network.metallb.namespace }}
+  labels:
+    {{- include "messages.labels" . | nindent 4 }}
+spec:
+  ipAddressPools:
+    - {{ include "messages.fullname" . }}
+  {{- with .Values.network.metallb.l2Advertisement.interfaces }}
+  interfaces:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+{{- end }}
+{{- end }}
+{{- if .Values.network.antreaEgress.enabled }}
+---
+apiVersion: {{ .Values.network.antreaEgress.apiVersion }}
+kind: Egress
+metadata:
+  name: {{ include "messages.fullname" . }}
+  labels:
+    {{- include "messages.labels" . | nindent 4 }}
+spec:
+  appliedTo:
+    podSelector:
+      matchLabels:
+        app.kubernetes.io/name: {{ include "messages.name" . }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+  externalIPPool: {{ .Values.network.antreaEgress.externalIPPool | quote }}
+  egressIP: {{ .Values.network.antreaEgress.egressIP | quote }}
+{{- end }}
+{{- if .Values.certificate.enabled }}
+---
+apiVersion: {{ .Values.certificate.apiVersion }}
+kind: Certificate
+metadata:
+  name: {{ include "messages.fullname" . }}-mta
+  labels:
+    {{- include "messages.labels" . | nindent 4 }}
+spec:
+  secretName: {{ .Values.certificate.secretName | quote }}
+  dnsNames:
+    - {{ .Values.mta.hostname | quote }}
+  issuerRef:
+    {{- toYaml .Values.certificate.issuerRef | nindent 4 }}
+{{- end }}
+{{- if .Values.dns.enabled }}
+---
+apiVersion: {{ .Values.dns.apiVersion }}
+kind: DNSEndpoint
+metadata:
+  name: {{ include "messages.fullname" . }}-mail
+  {{- with .Values.dns.namespace }}
+  namespace: {{ . }}
+  {{- end }}
+  labels:
+    {{- include "messages.labels" . | nindent 4 }}
+spec:
+  endpoints:
+    - dnsName: {{ .Values.mta.hostname | quote }}
+      recordType: A
+      recordTTL: {{ .Values.dns.ttl }}
+      targets:
+        - {{ .Values.dns.address | quote }}
+    {{- if .Values.dns.mx.enabled }}
+    - dnsName: {{ .Values.technicalDomain | quote }}
+      recordType: MX
+      recordTTL: {{ .Values.dns.ttl }}
+      targets:
+        - {{ printf "%v %s" .Values.dns.mx.priority .Values.mta.hostname | quote }}
+    {{- end }}
+    {{- if .Values.dns.spf.enabled }}
+    - dnsName: {{ .Values.technicalDomain | quote }}
+      recordType: TXT
+      recordTTL: {{ .Values.dns.ttl }}
+      targets:
+        - {{ .Values.dns.spf.value | quote }}
+    {{- end }}
+    {{- if .Values.dns.dkim.enabled }}
+    - dnsName: {{ printf "%s._domainkey.%s" .Values.dns.dkim.selector .Values.technicalDomain | quote }}
+      recordType: TXT
+      recordTTL: {{ .Values.dns.ttl }}
+      targets:
+        - {{ .Values.dns.dkim.value | quote }}
+    {{- end }}
+{{- end }}

@@ -1,0 +1,430 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "title": "Valeurs du chart Meet",
+  "definitions": {
+    "image": {
+      "type": "object",
+      "properties": {
+        "repository": { "type": "string", "minLength": 1 },
+        "tag": { "type": "string", "minLength": 1 },
+        "digest": {
+          "type": "string",
+          "pattern": "^$|^sha256:[a-f0-9]{64}$"
+        },
+        "pullPolicy": {
+          "type": "string",
+          "enum": ["Always", "IfNotPresent", "Never"]
+        }
+      }
+    }
+  },
+  "type": "object",
+  "required": ["domain", "existingSecret"],
+  "properties": {
+    "domain": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$"
+    },
+    "existingSecret": {
+      "type": "string",
+      "minLength": 1
+    },
+    "images": {
+      "type": "object",
+      "properties": {
+        "backend": { "$ref": "#/definitions/image" },
+        "frontend": { "$ref": "#/definitions/image" }
+      }
+    },
+    "secretKeys": {
+      "type": "object",
+      "properties": {
+        "summaryApiToken": { "type": "string", "minLength": 1 },
+        "summaryWebhookApiToken": { "type": "string", "minLength": 1 }
+      }
+    },
+    "postgresql": {
+      "type": "object",
+      "required": ["mode"],
+      "properties": {
+        "mode": { "type": "string", "enum": ["embedded", "external"] },
+        "external": {
+          "type": "object",
+          "properties": {
+            "host": { "type": "string" },
+            "database": { "type": "string" },
+            "user": { "type": "string" },
+            "port": { "type": "integer", "minimum": 1, "maximum": 65535 }
+          }
+        },
+        "embedded": {
+          "type": "object",
+          "properties": {
+            "image": { "$ref": "#/definitions/image" }
+          }
+        }
+      }
+    },
+    "redis": {
+      "type": "object",
+      "required": ["mode"],
+      "properties": {
+        "mode": { "type": "string", "enum": ["embedded", "external"] },
+        "external": {
+          "type": "object",
+          "properties": {
+            "url": { "type": "string" },
+            "celeryBrokerUrl": { "type": "string" }
+          }
+        },
+        "embedded": {
+          "type": "object",
+          "properties": {
+            "image": { "$ref": "#/definitions/image" }
+          }
+        }
+      }
+    },
+    "livekit": {
+      "type": "object",
+      "required": ["mode"],
+      "properties": {
+        "mode": { "type": "string", "enum": ["embedded", "external"] },
+        "host": {
+          "type": "string",
+          "pattern": "^$|^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$"
+        },
+        "external": {
+          "type": "object",
+          "properties": {
+            "endpoint": { "type": "string" }
+          }
+        },
+        "embedded": {
+          "type": "object",
+          "properties": {
+            "image": { "$ref": "#/definitions/image" }
+          }
+        }
+      }
+    },
+    "oidc": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "issuerUrl": { "type": "string" },
+        "authorizationEndpoint": { "type": "string" },
+        "tokenEndpoint": { "type": "string" },
+        "userEndpoint": { "type": "string" },
+        "jwksEndpoint": { "type": "string" },
+        "logoutEndpoint": { "type": "string" },
+        "clientId": { "type": "string" }
+      }
+    },
+    "smtp": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "host": { "type": "string" },
+        "port": { "type": "integer", "minimum": 1, "maximum": 65535 }
+      }
+    },
+    "media": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "endpoint": { "type": "string" },
+        "bucket": { "type": "string" },
+        "region": { "type": "string" }
+      }
+    },
+    "advanced": {
+      "type": "object",
+      "properties": {
+        "transcription": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "destination": { "type": "string" }
+          }
+        },
+        "summary": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "endpoint": { "type": "string" },
+            "version": { "type": "integer", "enum": [1, 2] }
+          }
+        }
+      }
+    },
+    "routing": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": { "type": "string", "enum": ["ingress", "gateway", "none"] },
+        "gateway": {
+          "type": "object",
+          "properties": {
+            "parentRefs": {
+              "type": "array",
+              "items": { "type": "object" }
+            }
+          }
+        }
+      }
+    },
+    "migrations": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "activeDeadlineSeconds": { "type": "integer", "minimum": 1 },
+        "retry": {
+          "type": "object",
+          "properties": {
+            "maxAttempts": { "type": "integer", "minimum": 1 },
+            "delaySeconds": { "type": "integer", "minimum": 1 }
+          }
+        }
+      }
+    },
+    "tests": {
+      "type": "object",
+      "properties": {
+        "image": { "$ref": "#/definitions/image" }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "advanced": {
+            "properties": {
+              "transcription": {
+                "properties": { "enabled": { "const": true } },
+                "required": ["enabled"]
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "advanced": {
+            "properties": {
+              "transcription": {
+                "required": ["destination"],
+                "properties": { "destination": { "minLength": 1 } }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "postgresql": {
+            "properties": { "mode": { "const": "external" } },
+            "required": ["mode"]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "postgresql": {
+            "properties": {
+              "external": {
+                "required": ["host", "database", "user"],
+                "properties": {
+                  "host": { "minLength": 1 },
+                  "database": { "minLength": 1 },
+                  "user": { "minLength": 1 }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "redis": {
+            "properties": { "mode": { "const": "external" } },
+            "required": ["mode"]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "redis": {
+            "properties": {
+              "external": {
+                "required": ["url"],
+                "properties": { "url": { "minLength": 1 } }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "livekit": {
+            "properties": { "mode": { "const": "embedded" } },
+            "required": ["mode"]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "livekit": {
+            "required": ["host"],
+            "properties": { "host": { "minLength": 1 } }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "livekit": {
+            "properties": { "mode": { "const": "external" } },
+            "required": ["mode"]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "livekit": {
+            "properties": {
+              "external": {
+                "required": ["endpoint"],
+                "properties": { "endpoint": { "minLength": 1 } }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "oidc": {
+            "properties": { "enabled": { "const": true } },
+            "required": ["enabled"]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "oidc": {
+            "required": ["authorizationEndpoint", "tokenEndpoint", "userEndpoint", "jwksEndpoint", "logoutEndpoint", "clientId"],
+            "properties": {
+              "authorizationEndpoint": { "minLength": 1 },
+              "tokenEndpoint": { "minLength": 1 },
+              "userEndpoint": { "minLength": 1 },
+              "jwksEndpoint": { "minLength": 1 },
+              "logoutEndpoint": { "minLength": 1 },
+              "clientId": { "minLength": 1 }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "smtp": {
+            "properties": { "enabled": { "const": true } },
+            "required": ["enabled"]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "smtp": {
+            "required": ["host", "from"],
+            "properties": {
+              "host": { "minLength": 1 },
+              "from": { "minLength": 1 }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "media": {
+            "properties": { "enabled": { "const": true } },
+            "required": ["enabled"]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "media": {
+            "required": ["endpoint", "bucket", "region"],
+            "properties": {
+              "endpoint": { "minLength": 1 },
+              "bucket": { "minLength": 1 },
+              "region": { "minLength": 1 }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "advanced": {
+            "properties": {
+              "summary": {
+                "properties": { "enabled": { "const": true } },
+                "required": ["enabled"]
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "advanced": {
+            "properties": {
+              "summary": {
+                "required": ["endpoint"],
+                "properties": { "endpoint": { "minLength": 1 } }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "routing": {
+            "properties": { "type": { "const": "gateway" } },
+            "required": ["type"]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "routing": {
+            "properties": {
+              "gateway": {
+                "properties": { "parentRefs": { "minItems": 1 } }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

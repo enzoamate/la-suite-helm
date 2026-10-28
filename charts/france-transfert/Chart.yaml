@@ -1,0 +1,15 @@
+apiVersion: v2
+name: france-transfert
+description: Déploiement générique de France Transfert sur Kubernetes
+type: application
+version: 0.1.0
+appVersion: "4.0.20"
+keywords:
+  - france-transfert
+  - file-transfer
+  - la-suite
+home: https://github.com/numerique-gouv/francetransfert
+sources:
+  - https://github.com/numerique-gouv/francetransfert/tree/4.0.20
+annotations:
+  licenses: Apache-2.0

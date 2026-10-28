@@ -1,0 +1,349 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "title": "Valeurs du chart France Transfert",
+  "type": "object",
+  "required": ["host", "existingSecret"],
+  "properties": {
+    "host": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$",
+      "description": "Nom DNS public de France Transfert, sans schéma ni chemin."
+    },
+    "existingSecret": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Secret Kubernetes existant contenant les clés applicatives documentées."
+    },
+    "oidc": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "issuerUrl": { "type": "string" },
+        "clientId": { "type": "string" },
+        "resourceServerIssuerUrl": { "type": "string" }
+      }
+    },
+    "smtp": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "host": { "type": "string" },
+        "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+        "from": { "type": "string" },
+        "auth": { "type": "boolean" },
+        "ssl": { "type": "boolean" },
+        "startTls": { "type": "boolean" }
+      }
+    },
+    "redis": {
+      "type": "object",
+      "properties": {
+        "embedded": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "image": {
+              "type": "object",
+              "properties": {
+                "repository": { "type": "string", "minLength": 1 },
+                "tag": { "type": "string", "minLength": 1 },
+                "digest": {
+                  "type": "string",
+                  "pattern": "^$|^sha256:[a-f0-9]{64}$"
+                }
+              }
+            }
+          }
+        },
+        "external": {
+          "type": "object",
+          "properties": {
+            "host": { "type": "string" },
+            "port": { "type": "integer", "minimum": 1, "maximum": 65535 }
+          }
+        }
+      }
+    },
+    "s3": {
+      "type": "object",
+      "properties": {
+        "embedded": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "image": {
+              "type": "object",
+              "properties": {
+                "repository": { "type": "string", "minLength": 1 },
+                "tag": { "type": "string", "minLength": 1 },
+                "digest": {
+                  "type": "string",
+                  "pattern": "^$|^sha256:[a-f0-9]{64}$"
+                }
+              }
+            }
+          }
+        },
+        "external": {
+          "type": "object",
+          "properties": {
+            "endpoint": { "type": "string" }
+          }
+        },
+        "expose": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "host": { "type": "string" }
+          }
+        }
+      }
+    },
+    "clamav": {
+      "type": "object",
+      "properties": {
+        "embedded": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "image": {
+              "type": "object",
+              "properties": {
+                "repository": { "type": "string", "minLength": 1 },
+                "tag": { "type": "string", "minLength": 1 },
+                "digest": {
+                  "type": "string",
+                  "pattern": "^$|^sha256:[a-f0-9]{64}$"
+                }
+              }
+            }
+          }
+        },
+        "external": {
+          "type": "object",
+          "properties": {
+            "host": { "type": "string" },
+            "port": { "type": "integer", "minimum": 1, "maximum": 65535 }
+          }
+        }
+      }
+    },
+    "routing": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["ingress", "gateway", "none"]
+        },
+        "gateway": {
+          "type": "object",
+          "properties": {
+            "parentRefs": {
+              "type": "array",
+              "items": { "type": "object" }
+            }
+          }
+        }
+      }
+    },
+    "initialize": {
+      "type": "object",
+      "properties": {
+        "activeDeadlineSeconds": { "type": "integer", "minimum": 1 },
+        "retry": {
+          "type": "object",
+          "properties": {
+            "maxAttempts": { "type": "integer", "minimum": 1 },
+            "delaySeconds": { "type": "integer", "minimum": 1 }
+          }
+        },
+        "timeouts": {
+          "type": "object",
+          "properties": {
+            "s3ConnectSeconds": { "type": "integer", "minimum": 1 },
+            "s3ReadSeconds": { "type": "integer", "minimum": 1 },
+            "redisSeconds": { "type": "integer", "minimum": 1 }
+          }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "oidc": {
+            "properties": { "enabled": { "const": true } },
+            "required": ["enabled"]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "oidc": {
+            "required": ["issuerUrl", "clientId"],
+            "properties": {
+              "issuerUrl": { "minLength": 1 },
+              "clientId": { "minLength": 1 }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "smtp": {
+            "properties": { "enabled": { "const": true } },
+            "required": ["enabled"]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "smtp": {
+            "required": ["host", "from"],
+            "properties": {
+              "host": { "minLength": 1 },
+              "from": { "minLength": 1 }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "redis": {
+            "properties": {
+              "embedded": {
+                "properties": { "enabled": { "const": false } },
+                "required": ["enabled"]
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "redis": {
+            "properties": {
+              "external": {
+                "required": ["host"],
+                "properties": { "host": { "minLength": 1 } }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "s3": {
+            "properties": {
+              "embedded": {
+                "properties": { "enabled": { "const": false } },
+                "required": ["enabled"]
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "s3": {
+            "properties": {
+              "external": {
+                "required": ["endpoint"],
+                "properties": { "endpoint": { "minLength": 1 } }
+              },
+              "expose": {
+                "properties": { "enabled": { "const": false } }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "s3": {
+            "properties": {
+              "expose": {
+                "properties": { "enabled": { "const": true } },
+                "required": ["enabled"]
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "s3": {
+            "properties": {
+              "embedded": {
+                "properties": { "enabled": { "const": true } }
+              },
+              "expose": {
+                "required": ["host"],
+                "properties": { "host": { "minLength": 1 } }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "clamav": {
+            "properties": {
+              "embedded": {
+                "properties": { "enabled": { "const": false } },
+                "required": ["enabled"]
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "clamav": {
+            "properties": {
+              "external": {
+                "required": ["host"],
+                "properties": { "host": { "minLength": 1 } }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "routing": {
+            "properties": { "type": { "const": "gateway" } },
+            "required": ["type"]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "routing": {
+            "properties": {
+              "gateway": {
+                "properties": {
+                  "parentRefs": { "minItems": 1 }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

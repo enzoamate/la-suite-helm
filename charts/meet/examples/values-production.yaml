@@ -1,0 +1,75 @@
+domain: meet.example.com
+existingSecret: meet-production-secrets
+
+backend:
+  replicas: 3
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      memory: 2Gi
+
+frontend:
+  replicas: 2
+
+celery:
+  replicas: 2
+  concurrency: 2
+
+postgresql:
+  mode: external
+  external:
+    host: postgresql.example.org
+    port: 5432
+    database: meet
+    user: meet
+
+redis:
+  mode: external
+  external:
+    url: redis://redis.example.org:6379/1
+    celeryBrokerUrl: redis://redis.example.org:6379/0
+
+livekit:
+  mode: external
+  external:
+    endpoint: https://media.example.com
+
+oidc:
+  enabled: true
+  issuerUrl: https://identity.example.com
+  authorizationEndpoint: https://identity.example.com/oauth2/authorize
+  tokenEndpoint: https://identity.example.com/oauth2/token
+  userEndpoint: https://identity.example.com/oauth2/userinfo
+  jwksEndpoint: https://identity.example.com/oauth2/jwks
+  logoutEndpoint: https://identity.example.com/logout
+  clientId: meet
+  scopes: openid email profile
+
+smtp:
+  enabled: true
+  host: smtp.example.org
+  port: 587
+  username: meet
+  from: no-reply@example.com
+  useTLS: true
+
+media:
+  enabled: true
+  endpoint: https://objects.example.org
+  bucket: meet-media
+  region: region-1
+  fileUploadEnabled: true
+
+routing:
+  type: ingress
+  ingress:
+    className: nginx
+    annotations:
+      nginx.ingress.kubernetes.io/proxy-body-size: 100m
+      nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+      nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    tls:
+      enabled: true
+      secretName: meet-tls

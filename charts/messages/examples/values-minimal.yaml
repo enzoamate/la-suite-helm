@@ -1,0 +1,52 @@
+host: mail.example.org
+technicalDomain: msg.example.org
+existingSecret: messages-secrets
+
+secretKeys:
+  s3ImportsAccessKey: AWS_ACCESS_KEY_ID
+  s3ImportsSecretKey: AWS_SECRET_ACCESS_KEY
+  s3BlobsAccessKey: AWS_ACCESS_KEY_ID
+  s3BlobsSecretKey: AWS_SECRET_ACCESS_KEY
+  garageRpcSecret: GARAGE_RPC_SECRET
+  garageAdminToken: GARAGE_ADMIN_TOKEN
+
+postgresql:
+  mode: cnpg
+  cnpg:
+    bootstrapSecretName: messages-postgresql-bootstrap
+    storageClass: standard
+    size: 20Gi
+
+redis:
+  mode: embedded
+  embedded:
+    persistence:
+      enabled: false
+
+opensearch:
+  mode: embedded
+  embedded:
+    persistence:
+      enabled: false
+
+s3:
+  mode: embedded
+  embedded:
+    persistence:
+      enabled: false
+
+oidc:
+  enabled: false
+
+smtp:
+  enabled: false
+
+mta:
+  enabled: false
+
+routing:
+  type: ingress
+  ingress:
+    className: nginx
+    tls:
+      enabled: false

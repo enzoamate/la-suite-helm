@@ -1,0 +1,29 @@
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.tmp
+*.log
+
+# Secrets and local overrides
+.env
+.env.*
+!.env.example
+*secret*.yaml
+*secrets*.yaml
+!values.schema.json
+values.local.yaml
+values.private.yaml
+credentials*
+kubeconfig*
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Helm build output
+.cr-index/
+dist/
+*.tgz
+Chart.lock
+charts/*/charts/

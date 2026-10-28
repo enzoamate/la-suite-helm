@@ -1,0 +1,217 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "france-transfert.fullname" . }}-common
+  labels:
+    {{- include "france-transfert.labels" . | nindent 4 }}
+data:
+  SPRING_PROFILES_ACTIVE: prod
+  ROOT_LOG_LEVEL: {{ .Values.config.logLevel | quote }}
+  FT_LOG_LEVEL: {{ .Values.config.logLevel | quote }}
+  ENVIRONNEMENT: {{ .Values.config.environment | quote }}
+  APPLICATION_COOKIES_DOMAIN: {{ .Values.host | quote }}
+  METALOAD_HOST: {{ include "france-transfert.redisHost" . | quote }}
+  METALOAD_PORT: {{ ternary 6379 .Values.redis.external.port .Values.redis.embedded.enabled | quote }}
+  METALOAD_SENTINEL_ACTIVE: {{ .Values.redis.external.sentinel.enabled | quote }}
+  METALOAD_SENTINEL_NODES: {{ .Values.redis.external.sentinel.nodes | quote }}
+  METALOAD_SENTINEL_MASTER_NAME: {{ .Values.redis.external.sentinel.masterName | quote }}
+  METALOAD_POOLCONFIG_MAXTOTAL: "64"
+  METALOAD_POOLCONFIG_MAXIDLE: "32"
+  METALOAD_POOLCONFIG_MINIDLE: "4"
+  METALOAD_POOLCONFIG_MAXWAITMILLIS: "30000"
+  METALOAD_POOLCONFIG_MINEVICTABLEIDLETIMEMILLIS: "60000"
+  METALOAD_POOLCONFIG_TIMEBETWEENEVICTIONRUNSMILLIS: "30000"
+  METALOAD_POOLCONFIG_NUMTESTSPEREVICTIONRUN: "3"
+  METALOAD_POOLCONFIG_TESTONBORROW: "true"
+  METALOAD_POOLCONFIG_TESTONRETURN: "true"
+  METALOAD_POOLCONFIG_TESTWHILEIDLE: "true"
+  METALOAD_POOLCONFIG_BLOCKWHENEXHAUSTED: "true"
+  STORAGE_ENDPOINT: {{ include "france-transfert.s3Endpoint" . | quote }}
+  STORAGE_ENV: {{ .Values.s3.environment | quote }}
+  BUCKET_PREFIX: {{ .Values.config.bucketPrefix | quote }}
+  BUCKET_SEQUESTRE: {{ .Values.config.bucketSequestre | quote }}
+  BUCKET_EXPORT: {{ .Values.config.bucketExport | quote }}
+  AWS_DEFAULT_REGION: {{ .Values.s3.region | quote }}
+  AWS_JAVA_V1_DISABLE_DEPRECATION_ANNOUNCEMENT: "true"
+  UPLOAD_LIMIT: {{ .Values.config.uploadLimit | quote }}
+  UPLOAD_FILE_LIMIT: {{ .Values.config.uploadFileLimit | quote }}
+  EXPIRE_CONFIRMATION_CODE: "1200"
+  EXPIRE_TOKEN_SENDER: "1800"
+  ENCLOSURE_EXPIRE_DAYS: {{ .Values.config.expireDays | quote }}
+  ENCLOSURE_MAX_PASSWORD_TRY: "5"
+  PASSWORD_MINSIZE: "12"
+  PASSWORD_MAXSIZE_GENERATED: "20"
+  PASSWORD_LOWER_MIN: "3"
+  PASSWORD_UPPER_MIN: "3"
+  PASSWORD_SPECIAL_MIN: "3"
+  PASSWORD_DIGIT_MIN: "3"
+  PASSWORD_SPECIAL_LIST: "!@#$%^&*()_-:+"
+  API_KEY: "{}"
+  CONFIG_API_KEY: "{}"
+  EXTENSION_NAME: "ade,adp,app,appx,asp,aspx,bat,cer,chm,cmd,com,cpl,crt,dll,dmg,exe,hta,htm,html,iso,jar,js,lnk,msi,msp,pif,ps1,py,reg,scr,sh,vb,vbs,vhd,vhdx,xlam"
+  MIMETYPE_NAME: "text/html,application/javascript,application/java-archive,application/x-msdownload,application/x-dosexec,application/octet-stream"
+  MIMETYPE_FRONT: "audio/*,image/*,video/*,application/pdf,application/xhtml+xml,application/json,application/xml"
+  SPRING_MAIL_HOST: {{ .Values.smtp.host | quote }}
+  SPRING_MAIL_PORT: {{ .Values.smtp.port | quote }}
+  SPRING_MAIL_FTMAIL: {{ .Values.smtp.from | quote }}
+  CONTACT_MAIL: {{ .Values.smtp.from | quote }}
+  SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH: {{ .Values.smtp.auth | quote }}
+  SPRING_MAIL_PROPERTIES_MAIL_SMTP_SSL_ENABLE: {{ .Values.smtp.ssl | quote }}
+  SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE: {{ .Values.smtp.startTls | quote }}
+  URL_DOWNLOAD_API: {{ printf "https://%s/download/" .Values.host | quote }}
+  URL_ADMIN_PAGE: {{ printf "https://%s/admin" .Values.host | quote }}
+  MAIL_IMAGE_FT_LOGO: {{ printf "https://%s/statics/logos/france_transfert_logo.svg" .Values.host | quote }}
+  MAIL_IMAGE_FT_FILE: {{ printf "https://%s/statics/email-contents/Fichier_white.png" .Values.host | quote }}
+  MAIL_IMAGE_FT_FOLDER: {{ printf "https://%s/statics/email-contents/Dossier_white.png" .Values.host | quote }}
+  MAIL_IMAGE_FT_ACCESSBUTTON: {{ printf "https://%s/statics/email-contents/acceder-fichiers.png" .Values.host | quote }}
+  SUBJECT_SENDER: "Vos fichiers ont bien été envoyés"
+  SUBJECT_SENDER_LINK: "Lien France Transfert généré"
+  SUBJECT_RECIPIENT: "Vous avez reçu des fichiers avec France Transfert"
+  SUBJECT_RECIPIENT_PASSWORD: "Mot de passe pour votre transfert"
+  SUBJECT_SENDER_PASSWORD: "Rappel du mot de passe pour votre transfert"
+  SUBJECT_RELAUNCH_RECIPIENT: "Des fichiers sont encore disponibles"
+  SUBJECT_DOWNLOAD_PROGRESS: "Vos fichiers sont en cours de téléchargement"
+  SUBJECT_NO_AVAILBLE_ENCLOSURE_RECIPIENT: "Les fichiers ne sont plus disponibles"
+  SUBJECT_NO_AVAILBLE_ENCLOSURE_SENDER: "Certains destinataires n'ont pas téléchargé vos fichiers"
+  SUBJECT_CONFIRMATION_CODE: "Code de confirmation France Transfert"
+  SUBJECT_VIRUS_SENDER: "Un fichier dangereux a été supprimé"
+  SUBJECT_VIRUS_ERROR_SENDER: "Votre transfert n'a pas pu être traité"
+  SUBJECT_MAIL_CONTACT: "Contact France Transfert"
+  SUBJECT_SENDEREN: "Your files have been sent"
+  SUBJECT_SENDER_LINKEN: "France Transfert link generated"
+  SUBJECT_RECIPIENTEN: "You received files with France Transfert"
+  SUBJECT_RECIPIENT_PASSWORDEN: "Password for your transfer"
+  SUBJECT_SENDER_PASSWORDEN: "Password reminder for your transfer"
+  SUBJECT_RELAUNCH_RECIPIENTEN: "Files are still available"
+  SUBJECT_DOWNLOAD_PROGRESSEN: "Your files are being downloaded"
+  SUBJECT_NO_AVAILBLE_ENCLOSURE_RECIPIENTEN: "Files are no longer available"
+  SUBJECT_NO_AVAILBLE_ENCLOSURE_SENDEREN: "Some recipients did not download your files"
+  SUBJECT_CONFIRMATION_CODEEN: "France Transfert confirmation code"
+  SUBJECT_VIRUS_SENDEREN: "A dangerous file was deleted"
+  SUBJECT_VIRUS_ERROR_SENDEREN: "Your transfer could not be processed"
+  SUBJECT_MAIL_CONTACTEN: "France Transfert contact"
+  WORKER_EXPIRED_LIMIT: "90"
+  GLIMPS_SCAN_URL: "http://localhost/disabled"
+  GLIMPS_CHECK_URL: "http://localhost/disabled"
+  GLIMPS_AUTH_TOKEN_KEY: X-Api-Key
+  GLIMPS_AUTH_TOKEN_VALUE: disabled
+  GLIMPS_KNOWNCODE: "5000,5001"
+  CHECK_FILE_PATH: /tmp/
+  OSMOSE_MOCK_DEFAULTVALUE: example.org
+  RESANA_MOCK_DEFAULTVALUE: example.org
+  RIZOMO_MOCK_DEFAULTVALUE: example.org
+  RIZOMO_APPLICATION: FranceTransfert
+  REF_DOMAIN_TOKEN: disabled
+  REF_DOMAIN_URL: "http://localhost/disabled"
+  REF_STAT_URL: "http://localhost/disabled"
+  REF_STAT_TOKEN: disabled
+  REF_STAT_HEADER: Authorization
+  HEALTHCHECK_CONFIG_URL: {{ printf "http://%s-upload:%v/api-private/upload-module/config" (include "france-transfert.fullname" .) .Values.upload.service.port | quote }}
+  HEALTHCHECK_SMTP_HOST: {{ ternary .Values.smtp.host "localhost" .Values.smtp.enabled | quote }}
+  HEALTHCHECK_SMTP_PORT: {{ ternary .Values.smtp.port 9 .Values.smtp.enabled | quote }}
+  HEALTHCHECK_SMTP_TYPE: {{ .Values.smtp.healthcheck.type | quote }}
+  {{- range $key, $value := .Values.config.extraEnv }}
+  {{ $key }}: {{ $value | quote }}
+  {{- end }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "france-transfert.fullname" . }}-upload
+  labels:
+    {{- include "france-transfert.labels" . | nindent 4 }}
+data:
+  JAVA_TOOL_OPTIONS: {{ printf "-XX:+UseContainerSupport -XX:MaxRAMPercentage=60 -Duser.timezone=%s" .Values.config.timezone | quote }}
+  SERVER_PORT: "8080"
+  MANAGEMENT_SERVER_PORT: "8880"
+  MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,metrics,prometheus
+  SERVER_TOMCAT_BASEDIR: /opt/work/
+  SPRING_SERVLET_MULTIPART_MAX_FILE_SIZE: 20MB
+  SPRING_SERVLET_MULTIPART_MAX_REQUEST_SIZE: 20MB
+  SERVER_COMPRESSION_ENABLED: "true"
+  UPLOAD_LIMIT_SENDERMAIL: "10"
+  UPLOAD_TOKEN_CHUNKMODULO: "6"
+  UPLOAD_EXPIRED_LIMIT: "90"
+  UPLOAD_MAX_RECIPIENT_AGENT: {{ .Values.config.maxRecipientsAgent | quote }}
+  UPLOAD_MAX_RECIPIENT_PUBLIC: {{ .Values.config.maxRecipientsPublic | quote }}
+  EXPIRE_CONFIRMATION_CODE_LENGTH: "8"
+  EXPIRE_TOKEN_INITAPI: "120"
+  CAPTCHA_SECURE: "false"
+  URL_DOWNLOAD_PUBLIC: {{ printf "https://%s/download/download-info-public?enclosure=" .Values.host | quote }}
+  AGENTCONNECT_ENABLED: {{ .Values.oidc.enabled | quote }}
+  AGENTCONNECT_ISSUERURL: {{ .Values.oidc.issuerUrl | quote }}
+  AGENTCONNECT_CLIENTID: {{ .Values.oidc.clientId | quote }}
+  SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUERURI: {{ default .Values.oidc.issuerUrl .Values.oidc.resourceServerIssuerUrl | quote }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "france-transfert.fullname" . }}-download
+  labels:
+    {{- include "france-transfert.labels" . | nindent 4 }}
+data:
+  JAVA_TOOL_OPTIONS: {{ printf "-XX:+UseContainerSupport -XX:MaxRAMPercentage=60 -Duser.timezone=%s" .Values.config.timezone | quote }}
+  SERVER_PORT: "8081"
+  MANAGEMENT_SERVER_PORT: "8180"
+  MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,metrics,prometheus
+  SERVER_COMPRESSION_ENABLED: "true"
+  ENCLOSURE_MAX_DOWNLOAD: "5"
+  AGENTCONNECT_ENABLED: {{ .Values.oidc.enabled | quote }}
+  AGENTCONNECT_ISSUERURL: {{ .Values.oidc.issuerUrl | quote }}
+  AGENTCONNECT_CLIENTID: {{ .Values.oidc.clientId | quote }}
+  SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUERURI: {{ default .Values.oidc.issuerUrl .Values.oidc.resourceServerIssuerUrl | quote }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "france-transfert.fullname" . }}-worker
+  labels:
+    {{- include "france-transfert.labels" . | nindent 4 }}
+data:
+  JAVA_TOOL_OPTIONS: {{ printf "-XX:+UseContainerSupport -XX:MaxRAMPercentage=60 -Duser.timezone=%s --enable-native-access=ALL-UNNAMED" .Values.config.timezone | quote }}
+  MANAGEMENT_SERVER_PORT: {{ .Values.worker.managementPort | quote }}
+  MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,metrics,prometheus
+  MANAGEMENT_HEALTH_MAIL_ENABLED: {{ and .Values.smtp.enabled .Values.smtp.healthcheck.enabled | quote }}
+  SERVER_TOMCAT_BASEDIR: /opt/work/
+  TMP_FOLDER_PATH: /tmp/
+  SCAN_CLAMAV_HOST: {{ include "france-transfert.clamavHost" . | quote }}
+  SCAN_CLAMAV_PORT: {{ ternary 3310 .Values.clamav.external.port .Values.clamav.embedded.enabled | quote }}
+  SCAN_CLAMAV_TIMEOUT: "120000"
+  SCAN_CLAMAV_CHUNKSIZE: "655360"
+  SCAN_CLAMAV_MAXFILESIZE: {{ .Values.config.uploadFileLimit | quote }}
+  GLIMPS_ENABLED: "false"
+  SNAP_MOCK: "true"
+  POOL_SIZE: "10"
+  SATISFACTIONWORKEREXECUTOR_POOL_SIZE: "2"
+  SENDEMAILCONFIRMATIONCODEWORKER_POOL_SIZE: "2"
+  TEMPDATACLEANUPWORKEREXECUTOR_POOL_SIZE: "2"
+  ZIPWORKEREXECUTOR_POOL_SIZE: "2"
+  SENDEMAILDOWNLOADINPROGRESSWORKEREXECUTOR_POOL_SIZE: "2"
+  UPLOADDOWNLOADWORKEREXECUTOR_POOL_SIZE: "2"
+  STATWORKEREXECUTOR_POOL_SIZE: "2"
+  EXPIRE_MONTH: "12"
+  RELAUNCH_MAIL_DAYS: "7"
+  SCHEDULED_RELAUNCH_MAIL: "0 0 2 * * ?"
+  SCHEDULED_CLEAN_UP: "0 30 0 * * *"
+  SCHEDULED_APP_SYNC_CLEANUP: "20 0 */1 * * *"
+  SCHEDULED_APP_SYNC_RELAUNCH: "20 0 */1 * * *"
+  SCHEDULED_APP_SYNC_IGNIMISSION_DOMAIN: "20 0 */1 * * *"
+  SCHEDULED_IGNIMISSION_DOMAIN: "0 45 3 * * *"
+  SCHEDULED_APP_SYNC_REF_DOMAIN: "20 0 */1 * * *"
+  SCHEDULED_REF_DOMAIN: "0 45 2 * * *"
+  SCHEDULED_SEND_STAT: "0 10 2 * * *"
+  SCHEDULED_SENDCHECKMAIL: "0 0 0 1 * ?"
+  SCHEDULED_CHECKMAIL: "0 0 0 1 * ?"
+  SCHEDULED_SYNC_CHECKMAIL: "20 */45 * * * ?"
+  SCHEDULED_SYNC_CHECKGLIMPS: "10 */2 * * * ?"
+  SCHEDULED_CHECKGLIMPS: "0 */2 * * * ?"
+  SCHEDULED_SYNC_HEALTHCHECK: "10 0 * * * ?"
+  SCHEDULED_HEALTHCHECK: "0 0 * * * ?"
+  DEEPCLEAN_WEEKDAY: "7"
+  QUEUE_SIZE: "2"
+  QUEUE_SLEEP: "200"
+  DISABLESSL: "false"
+  ENABLEMTLS: "false"
+  STORAGE_REQUEST_TIMEOUT: "300000"
+  DOWNLOADEXECUTOR_ENABLED: "false"
+  DOWNLOADEXECUTOR_POOL_SIZE: "1"

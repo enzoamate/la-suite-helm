@@ -1,0 +1,169 @@
+{{- if and (eq .Values.s3.mode "embedded") .Values.garageInit.enabled }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "messages.fullname" . }}-garage-init
+  labels:
+    {{- include "messages.labels" . | nindent 4 }}
+    app.kubernetes.io/component: garage-init
+automountServiceAccountToken: true
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "messages.fullname" . }}-garage-init
+  labels:
+    {{- include "messages.labels" . | nindent 4 }}
+    app.kubernetes.io/component: garage-init
+rules:
+  - apiGroups: [""]
+    resources: [pods]
+    verbs: [get, list, watch]
+  - apiGroups: [""]
+    resources: [pods/exec]
+    resourceNames:
+      - {{ include "messages.fullname" . }}-s3-0
+    verbs: [create]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "messages.fullname" . }}-garage-init
+  labels:
+    {{- include "messages.labels" . | nindent 4 }}
+    app.kubernetes.io/component: garage-init
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "messages.fullname" . }}-garage-init
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "messages.fullname" . }}-garage-init
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "messages.fullname" . }}-garage-init-{{ .Release.Revision }}
+  labels:
+    {{- include "messages.labels" . | nindent 4 }}
+    app.kubernetes.io/component: garage-init
+spec:
+  backoffLimit: {{ .Values.garageInit.backoffLimit }}
+  activeDeadlineSeconds: {{ .Values.garageInit.activeDeadlineSeconds }}
+  ttlSecondsAfterFinished: {{ .Values.garageInit.ttlSecondsAfterFinished }}
+  template:
+    metadata:
+      labels:
+        {{- include "messages.selectorLabels" (dict "root" . "component" "garage-init") | nindent 8 }}
+    spec:
+      restartPolicy: OnFailure
+      serviceAccountName: {{ include "messages.fullname" . }}-garage-init
+      automountServiceAccountToken: true
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.garageInit.podSecurityContext | nindent 8 }}
+      containers:
+        - name: initialize
+          image: {{ include "messages.image" .Values.garageInit.image | quote }}
+          imagePullPolicy: {{ .Values.garageInit.image.pullPolicy }}
+          command: [/bin/sh, -ec]
+          args:
+            - |
+              pod={{ printf "%s-s3-0" (include "messages.fullname" .) | quote }}
+              attempt=1
+              until kubectl get pod "$pod" >/dev/null 2>&1 &&
+                    kubectl wait --for=condition=Ready "pod/$pod" --timeout=5s >/dev/null 2>&1; do
+                if [ "$attempt" -ge "$MAX_ATTEMPTS" ]; then
+                  echo "Garage indisponible après ${attempt} tentatives" >&2
+                  exit 1
+                fi
+                attempt=$((attempt + 1))
+                sleep "$RETRY_DELAY"
+              done
+
+              layout="$(kubectl exec "$pod" -- /garage layout show)"
+              node_id="$(kubectl exec "$pod" -- /garage node id -q | cut -d@ -f1)"
+              short_id="$(printf %s "$node_id" | cut -c1-16)"
+              if ! printf '%s\n' "$layout" | grep -q "${short_id}.*${GARAGE_ZONE}"; then
+                kubectl exec "$pod" -- /garage layout assign \
+                  --zone "$GARAGE_ZONE" --capacity "$GARAGE_CAPACITY" "$node_id"
+                layout="$(kubectl exec "$pod" -- /garage layout show)"
+                version="$(printf '%s\n' "$layout" |
+                  sed -n 's/.*garage layout apply --version \([0-9][0-9]*\).*/\1/p' |
+                  tail -n 1)"
+                if [ -z "$version" ]; then
+                  echo "Version de layout Garage introuvable" >&2
+                  exit 1
+                fi
+                kubectl exec "$pod" -- /garage layout apply --version "$version"
+              fi
+
+              ensure_key() {
+                name="$1"
+                access="$2"
+                secret="$3"
+                kubectl exec "$pod" -- /garage key info "$access" >/dev/null 2>&1 ||
+                  kubectl exec "$pod" -- /garage key import --yes -n "$name" "$access" "$secret"
+              }
+              ensure_bucket() {
+                bucket="$1"
+                access="$2"
+                kubectl exec "$pod" -- /garage bucket info "$bucket" >/dev/null 2>&1 ||
+                  kubectl exec "$pod" -- /garage bucket create "$bucket"
+                kubectl exec "$pod" -- /garage bucket allow \
+                  --read --write --owner --key "$access" "$bucket"
+              }
+
+              ensure_key messages-imports "$IMPORTS_ACCESS_KEY" "$IMPORTS_SECRET_KEY"
+              ensure_key messages-blobs "$BLOBS_ACCESS_KEY" "$BLOBS_SECRET_KEY"
+              ensure_bucket "$IMPORTS_BUCKET" "$IMPORTS_ACCESS_KEY"
+              ensure_bucket "$BLOBS_BUCKET" "$BLOBS_ACCESS_KEY"
+          env:
+            - name: HOME
+              value: /tmp
+            - name: MAX_ATTEMPTS
+              value: {{ .Values.garageInit.retry.maxAttempts | quote }}
+            - name: RETRY_DELAY
+              value: {{ .Values.garageInit.retry.delaySeconds | quote }}
+            - name: GARAGE_ZONE
+              value: {{ .Values.s3.embedded.zone | quote }}
+            - name: GARAGE_CAPACITY
+              value: {{ .Values.s3.embedded.capacity | quote }}
+            - name: IMPORTS_BUCKET
+              value: {{ .Values.s3.imports.bucket | quote }}
+            - name: BLOBS_BUCKET
+              value: {{ .Values.s3.blobs.bucket | quote }}
+            - name: IMPORTS_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "messages.secretName" . }}
+                  key: {{ .Values.secretKeys.s3ImportsAccessKey }}
+            - name: IMPORTS_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "messages.secretName" . }}
+                  key: {{ .Values.secretKeys.s3ImportsSecretKey }}
+            - name: BLOBS_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "messages.secretName" . }}
+                  key: {{ .Values.secretKeys.s3BlobsAccessKey }}
+            - name: BLOBS_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "messages.secretName" . }}
+                  key: {{ .Values.secretKeys.s3BlobsSecretKey }}
+          resources: {}
+          securityContext:
+            {{- toYaml .Values.garageInit.securityContext | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+{{- end }}

@@ -1,0 +1,93 @@
+{{- if .Values.migration.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "messages.fullname" . }}-migrate
+  labels:
+    {{- include "messages.labels" . | nindent 4 }}
+    app.kubernetes.io/component: migration
+  {{- if .Release.IsUpgrade }}
+  annotations:
+    helm.sh/hook: pre-upgrade
+    helm.sh/hook-weight: "0"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+  {{- end }}
+spec:
+  backoffLimit: {{ .Values.migration.backoffLimit }}
+  activeDeadlineSeconds: {{ .Values.migration.activeDeadlineSeconds }}
+  ttlSecondsAfterFinished: {{ .Values.migration.ttlSecondsAfterFinished }}
+  template:
+    metadata:
+      labels:
+        {{- include "messages.selectorLabels" (dict "root" . "component" "migration") | nindent 8 }}
+    spec:
+      restartPolicy: OnFailure
+      serviceAccountName: {{ include "messages.serviceAccountName" . }}
+      automountServiceAccountToken: {{ .Values.serviceAccount.automountServiceAccountToken }}
+      securityContext:
+        {{- toYaml .Values.migration.podSecurityContext | nindent 8 }}
+      containers:
+        - name: migrate
+          image: {{ include "messages.image" .Values.images.backend | quote }}
+          imagePullPolicy: {{ .Values.images.backend.pullPolicy }}
+          command:
+            - /bin/sh
+            - -ec
+          args:
+            - |
+              attempt=1
+              until python manage.py check --database default >/dev/null 2>&1; do
+                if [ "$attempt" -ge "$MAX_ATTEMPTS" ]; then
+                  echo "Base de données indisponible après ${attempt} tentatives" >&2
+                  exit 1
+                fi
+                attempt=$((attempt + 1))
+                sleep "$RETRY_DELAY"
+              done
+              python manage.py migrate --noinput
+              python manage.py search_index_create
+              python - <<'PY'
+              import os
+              import time
+              import boto3
+
+              stores = (
+                  ("STORAGE_MESSAGE_IMPORTS_ENDPOINT_URL", "STORAGE_MESSAGE_IMPORTS_BUCKET_NAME",
+                   "STORAGE_MESSAGE_IMPORTS_ACCESS_KEY", "STORAGE_MESSAGE_IMPORTS_SECRET_KEY"),
+                  ("STORAGE_MESSAGE_BLOBS_ENDPOINT_URL", "STORAGE_MESSAGE_BLOBS_BUCKET_NAME",
+                   "STORAGE_MESSAGE_BLOBS_ACCESS_KEY", "STORAGE_MESSAGE_BLOBS_SECRET_KEY"),
+              )
+              for endpoint_var, bucket_var, access_var, secret_var in stores:
+                  client = boto3.client(
+                      "s3",
+                      endpoint_url=os.environ[endpoint_var],
+                      region_name=os.environ["AWS_S3_REGION_NAME"],
+                      aws_access_key_id=os.environ[access_var],
+                      aws_secret_access_key=os.environ[secret_var],
+                  )
+                  for attempt in range(int(os.environ["MAX_ATTEMPTS"])):
+                      try:
+                          client.head_bucket(Bucket=os.environ[bucket_var])
+                          break
+                      except Exception:
+                          if attempt + 1 == int(os.environ["MAX_ATTEMPTS"]):
+                              raise
+                          time.sleep(int(os.environ["RETRY_DELAY"]))
+              PY
+              python manage.py bucket_cors --storage message-imports --set
+          envFrom:
+            - configMapRef:
+                name: {{ include "messages.fullname" . }}-backend
+            - secretRef:
+                name: {{ include "messages.secretName" . }}
+          env:
+            {{- include "messages.storageSecretEnv" . | nindent 12 }}
+            - name: MAX_ATTEMPTS
+              value: {{ .Values.migration.retry.maxAttempts | quote }}
+            - name: RETRY_DELAY
+              value: {{ .Values.migration.retry.delaySeconds | quote }}
+          resources:
+            {{- toYaml .Values.migration.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.migration.securityContext | nindent 12 }}
+{{- end }}

@@ -1,0 +1,31 @@
+domain: meet.example.com
+existingSecret: meet-secrets
+
+postgresql:
+  mode: embedded
+  embedded:
+    persistence:
+      enabled: false
+
+redis:
+  mode: embedded
+  embedded:
+    persistence:
+      enabled: false
+
+livekit:
+  mode: embedded
+  host: media.example.com
+  embedded:
+    service:
+      type: LoadBalancer
+
+oidc:
+  enabled: false
+
+routing:
+  type: ingress
+  ingress:
+    className: nginx
+    tls:
+      enabled: true

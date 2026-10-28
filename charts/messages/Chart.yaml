@@ -1,0 +1,15 @@
+apiVersion: v2
+name: messages
+description: Déploiement générique de La Suite Messages sur Kubernetes
+type: application
+version: 0.1.0
+appVersion: "0.10.0"
+keywords:
+  - messages
+  - webmail
+  - la-suite
+home: https://github.com/suitenumerique/messages
+sources:
+  - https://github.com/suitenumerique/messages
+annotations:
+  licenses: MIT

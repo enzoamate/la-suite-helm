@@ -1,0 +1,410 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "france-transfert.fullname" . }}-front
+  labels:
+    {{- include "france-transfert.labels" . | nindent 4 }}
+    app.kubernetes.io/component: front
+spec:
+  type: {{ .Values.front.service.type }}
+  selector:
+    {{- include "france-transfert.selectorLabels" (dict "root" . "component" "front") | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.front.service.port }}
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "france-transfert.fullname" . }}-front
+  labels:
+    {{- include "france-transfert.labels" . | nindent 4 }}
+    app.kubernetes.io/component: front
+spec:
+  replicas: {{ .Values.front.replicas }}
+  selector:
+    matchLabels:
+      {{- include "france-transfert.selectorLabels" (dict "root" . "component" "front") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "france-transfert.selectorLabels" (dict "root" . "component" "front") | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      serviceAccountName: {{ include "france-transfert.serviceAccountName" . }}
+      automountServiceAccountToken: {{ .Values.serviceAccount.automountServiceAccountToken }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.front.podSecurityContext | nindent 8 }}
+      containers:
+        - name: front
+          image: {{ include "france-transfert.image" .Values.images.front | quote }}
+          imagePullPolicy: {{ .Values.images.front.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8080
+          {{- if .Values.front.probes.startup.enabled }}
+          startupProbe:
+            httpGet:
+              path: {{ .Values.front.probes.startup.path }}
+              port: http
+            {{- omit .Values.front.probes.startup "enabled" "path" | toYaml | nindent 12 }}
+          {{- end }}
+          {{- if .Values.front.probes.readiness.enabled }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.front.probes.readiness.path }}
+              port: http
+            {{- omit .Values.front.probes.readiness "enabled" "path" | toYaml | nindent 12 }}
+          {{- end }}
+          {{- if .Values.front.probes.liveness.enabled }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.front.probes.liveness.path }}
+              port: http
+            {{- omit .Values.front.probes.liveness "enabled" "path" | toYaml | nindent 12 }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.front.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.front.securityContext | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: tmp
+              mountPath: /opt/bitnami/nginx/tmp
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: {{ .Values.front.tmp.sizeLimit }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "france-transfert.fullname" . }}-upload
+  labels:
+    {{- include "france-transfert.labels" . | nindent 4 }}
+    app.kubernetes.io/component: upload
+spec:
+  type: {{ .Values.upload.service.type }}
+  selector:
+    {{- include "france-transfert.selectorLabels" (dict "root" . "component" "upload") | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.upload.service.port }}
+      targetPort: http
+    - name: management
+      port: {{ .Values.upload.service.managementPort }}
+      targetPort: management
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "france-transfert.fullname" . }}-upload
+  labels:
+    {{- include "france-transfert.labels" . | nindent 4 }}
+    app.kubernetes.io/component: upload
+spec:
+  replicas: {{ .Values.upload.replicas }}
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "france-transfert.selectorLabels" (dict "root" . "component" "upload") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "france-transfert.selectorLabels" (dict "root" . "component" "upload") | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmaps.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ include "france-transfert.serviceAccountName" . }}
+      automountServiceAccountToken: {{ .Values.serviceAccount.automountServiceAccountToken }}
+      terminationGracePeriodSeconds: 300
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.upload.podSecurityContext | nindent 8 }}
+      containers:
+        - name: upload
+          image: {{ include "france-transfert.image" .Values.images.upload | quote }}
+          imagePullPolicy: {{ .Values.images.upload.pullPolicy }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "france-transfert.fullname" . }}-common
+            - configMapRef:
+                name: {{ include "france-transfert.fullname" . }}-upload
+            - secretRef:
+                name: {{ include "france-transfert.secretName" . }}
+          ports:
+            - name: http
+              containerPort: 8080
+            - name: management
+              containerPort: 8880
+          {{- if .Values.upload.probes.startup.enabled }}
+          startupProbe:
+            httpGet:
+              path: {{ .Values.upload.probes.startup.path }}
+              port: management
+            {{- omit .Values.upload.probes.startup "enabled" "path" | toYaml | nindent 12 }}
+          {{- end }}
+          {{- if .Values.upload.probes.readiness.enabled }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.upload.probes.readiness.path }}
+              port: management
+            {{- omit .Values.upload.probes.readiness "enabled" "path" | toYaml | nindent 12 }}
+          {{- end }}
+          {{- if .Values.upload.probes.liveness.enabled }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.upload.probes.liveness.path }}
+              port: management
+            {{- omit .Values.upload.probes.liveness "enabled" "path" | toYaml | nindent 12 }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.upload.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.upload.securityContext | nindent 12 }}
+          volumeMounts:
+            - name: work
+              mountPath: /tmp
+            - name: work
+              mountPath: /opt/work
+      volumes:
+        - name: work
+          emptyDir:
+            sizeLimit: {{ .Values.upload.work.sizeLimit }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "france-transfert.fullname" . }}-download
+  labels:
+    {{- include "france-transfert.labels" . | nindent 4 }}
+    app.kubernetes.io/component: download
+spec:
+  type: {{ .Values.download.service.type }}
+  selector:
+    {{- include "france-transfert.selectorLabels" (dict "root" . "component" "download") | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.download.service.port }}
+      targetPort: http
+    - name: management
+      port: {{ .Values.download.service.managementPort }}
+      targetPort: management
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "france-transfert.fullname" . }}-download
+  labels:
+    {{- include "france-transfert.labels" . | nindent 4 }}
+    app.kubernetes.io/component: download
+spec:
+  replicas: {{ .Values.download.replicas }}
+  selector:
+    matchLabels:
+      {{- include "france-transfert.selectorLabels" (dict "root" . "component" "download") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "france-transfert.selectorLabels" (dict "root" . "component" "download") | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmaps.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ include "france-transfert.serviceAccountName" . }}
+      automountServiceAccountToken: {{ .Values.serviceAccount.automountServiceAccountToken }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.download.podSecurityContext | nindent 8 }}
+      containers:
+        - name: download
+          image: {{ include "france-transfert.image" .Values.images.download | quote }}
+          imagePullPolicy: {{ .Values.images.download.pullPolicy }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "france-transfert.fullname" . }}-common
+            - configMapRef:
+                name: {{ include "france-transfert.fullname" . }}-download
+            - secretRef:
+                name: {{ include "france-transfert.secretName" . }}
+          ports:
+            - name: http
+              containerPort: 8081
+            - name: management
+              containerPort: 8180
+          {{- if .Values.download.probes.startup.enabled }}
+          startupProbe:
+            httpGet:
+              path: {{ .Values.download.probes.startup.path }}
+              port: management
+            {{- omit .Values.download.probes.startup "enabled" "path" | toYaml | nindent 12 }}
+          {{- end }}
+          {{- if .Values.download.probes.readiness.enabled }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.download.probes.readiness.path }}
+              port: management
+            {{- omit .Values.download.probes.readiness "enabled" "path" | toYaml | nindent 12 }}
+          {{- end }}
+          {{- if .Values.download.probes.liveness.enabled }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.download.probes.liveness.path }}
+              port: management
+            {{- omit .Values.download.probes.liveness "enabled" "path" | toYaml | nindent 12 }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.download.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.download.securityContext | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: work
+              mountPath: /opt/work
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: {{ .Values.download.tmp.sizeLimit }}
+        - name: work
+          emptyDir:
+            sizeLimit: {{ .Values.download.work.sizeLimit }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "france-transfert.fullname" . }}-worker
+  labels:
+    {{- include "france-transfert.labels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
+spec:
+  replicas: {{ .Values.worker.replicas }}
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "france-transfert.selectorLabels" (dict "root" . "component" "worker") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "france-transfert.selectorLabels" (dict "root" . "component" "worker") | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmaps.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ include "france-transfert.serviceAccountName" . }}
+      automountServiceAccountToken: {{ .Values.serviceAccount.automountServiceAccountToken }}
+      terminationGracePeriodSeconds: 180
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.worker.podSecurityContext | nindent 8 }}
+      containers:
+        - name: worker
+          image: {{ include "france-transfert.image" .Values.images.worker | quote }}
+          imagePullPolicy: {{ .Values.images.worker.pullPolicy }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "france-transfert.fullname" . }}-common
+            - configMapRef:
+                name: {{ include "france-transfert.fullname" . }}-worker
+            - secretRef:
+                name: {{ include "france-transfert.secretName" . }}
+          ports:
+            - name: management
+              containerPort: {{ .Values.worker.managementPort }}
+          {{- if .Values.worker.probes.startup.enabled }}
+          startupProbe:
+            httpGet:
+              path: {{ .Values.worker.probes.startup.path }}
+              port: management
+            {{- omit .Values.worker.probes.startup "enabled" "path" | toYaml | nindent 12 }}
+          {{- end }}
+          {{- if .Values.worker.probes.readiness.enabled }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.worker.probes.readiness.path }}
+              port: management
+            {{- omit .Values.worker.probes.readiness "enabled" "path" | toYaml | nindent 12 }}
+          {{- end }}
+          {{- if .Values.worker.probes.liveness.enabled }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.worker.probes.liveness.path }}
+              port: management
+            {{- omit .Values.worker.probes.liveness "enabled" "path" | toYaml | nindent 12 }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.worker.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.worker.securityContext | nindent 12 }}
+          volumeMounts:
+            - name: work
+              mountPath: /tmp
+            - name: work
+              mountPath: /opt/work
+            - name: work
+              mountPath: /data
+      volumes:
+        - name: work
+          {{- if .Values.worker.work.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "france-transfert.fullname" . }}-worker
+          {{- else }}
+          emptyDir:
+            sizeLimit: {{ .Values.worker.work.sizeLimit }}
+          {{- end }}
+{{- if .Values.worker.work.persistence.enabled }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "france-transfert.fullname" . }}-worker
+  labels:
+    {{- include "france-transfert.labels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
+spec:
+  accessModes:
+    {{- toYaml .Values.worker.work.persistence.accessModes | nindent 4 }}
+  {{- include "france-transfert.storageClass" .Values.worker.work.persistence.storageClass | nindent 2 }}
+  resources:
+    requests:
+      storage: {{ .Values.worker.work.persistence.size }}
+{{- end }}

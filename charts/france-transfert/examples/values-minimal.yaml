@@ -1,0 +1,30 @@
+host: transfert.example.org
+existingSecret: france-transfert-secrets
+
+oidc:
+  enabled: false
+
+smtp:
+  enabled: false
+
+routing:
+  type: ingress
+  ingress:
+    className: nginx
+    tls:
+      enabled: false
+
+redis:
+  embedded:
+    persistence:
+      enabled: false
+
+s3:
+  embedded:
+    persistence:
+      enabled: false
+
+clamav:
+  embedded:
+    persistence:
+      enabled: false

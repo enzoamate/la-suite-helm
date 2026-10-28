@@ -1,0 +1,178 @@
+{{- if eq .Values.postgresql.mode "embedded" }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "meet.fullname" . }}-postgresql
+  labels:
+    {{- include "meet.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgresql
+spec:
+  selector:
+    {{- include "meet.selectorLabels" (dict "root" . "component" "postgresql") | nindent 4 }}
+  ports:
+    - name: postgresql
+      port: {{ .Values.postgresql.port }}
+      targetPort: postgresql
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "meet.fullname" . }}-postgresql
+  labels:
+    {{- include "meet.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgresql
+spec:
+  serviceName: {{ include "meet.fullname" . }}-postgresql
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "meet.selectorLabels" (dict "root" . "component" "postgresql") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "meet.selectorLabels" (dict "root" . "component" "postgresql") | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "meet.serviceAccountName" . }}
+      automountServiceAccountToken: {{ .Values.serviceAccount.automountServiceAccountToken }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.postgresql.embedded.podSecurityContext | nindent 8 }}
+      containers:
+        - name: postgresql
+          image: {{ include "meet.image" .Values.postgresql.embedded.image | quote }}
+          imagePullPolicy: {{ .Values.postgresql.embedded.image.pullPolicy }}
+          env:
+            - name: POSTGRES_DB
+              value: {{ .Values.postgresql.database | quote }}
+            - name: POSTGRES_USER
+              value: {{ .Values.postgresql.user | quote }}
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "meet.secretName" . }}
+                  key: {{ .Values.secretKeys.databasePassword }}
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          ports:
+            - name: postgresql
+              containerPort: 5432
+          readinessProbe:
+            exec:
+              command: [pg_isready, -U, {{ .Values.postgresql.user | quote }}, -d, {{ .Values.postgresql.database | quote }}]
+            {{- toYaml .Values.postgresql.embedded.probes.readiness | nindent 12 }}
+          livenessProbe:
+            tcpSocket:
+              port: postgresql
+            {{- toYaml .Values.postgresql.embedded.probes.liveness | nindent 12 }}
+          resources:
+            {{- toYaml .Values.postgresql.embedded.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.postgresql.embedded.securityContext | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+      {{- if not .Values.postgresql.embedded.persistence.enabled }}
+      volumes:
+        - name: data
+          emptyDir: {}
+      {{- end }}
+  {{- if .Values.postgresql.embedded.persistence.enabled }}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes:
+          {{- toYaml .Values.postgresql.embedded.persistence.accessModes | nindent 10 }}
+        {{- include "meet.storageClass" .Values.postgresql.embedded.persistence.storageClass | nindent 8 }}
+        resources:
+          requests:
+            storage: {{ .Values.postgresql.embedded.persistence.size }}
+  {{- end }}
+{{- end }}
+{{- if eq .Values.redis.mode "embedded" }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "meet.fullname" . }}-redis
+  labels:
+    {{- include "meet.labels" . | nindent 4 }}
+    app.kubernetes.io/component: redis
+spec:
+  selector:
+    {{- include "meet.selectorLabels" (dict "root" . "component" "redis") | nindent 4 }}
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: redis
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "meet.fullname" . }}-redis
+  labels:
+    {{- include "meet.labels" . | nindent 4 }}
+    app.kubernetes.io/component: redis
+spec:
+  serviceName: {{ include "meet.fullname" . }}-redis
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "meet.selectorLabels" (dict "root" . "component" "redis") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "meet.selectorLabels" (dict "root" . "component" "redis") | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "meet.serviceAccountName" . }}
+      automountServiceAccountToken: {{ .Values.serviceAccount.automountServiceAccountToken }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.redis.embedded.podSecurityContext | nindent 8 }}
+      containers:
+        - name: redis
+          image: {{ include "meet.image" .Values.redis.embedded.image | quote }}
+          imagePullPolicy: {{ .Values.redis.embedded.image.pullPolicy }}
+          args: [--appendonly, "yes", --maxmemory-policy, noeviction]
+          ports:
+            - name: redis
+              containerPort: 6379
+          readinessProbe:
+            exec:
+              command: [redis-cli, ping]
+            {{- toYaml .Values.redis.embedded.probes.readiness | nindent 12 }}
+          livenessProbe:
+            exec:
+              command: [redis-cli, ping]
+            {{- toYaml .Values.redis.embedded.probes.liveness | nindent 12 }}
+          resources:
+            {{- toYaml .Values.redis.embedded.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.redis.embedded.securityContext | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      {{- if not .Values.redis.embedded.persistence.enabled }}
+      volumes:
+        - name: data
+          emptyDir: {}
+      {{- end }}
+  {{- if .Values.redis.embedded.persistence.enabled }}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes:
+          {{- toYaml .Values.redis.embedded.persistence.accessModes | nindent 10 }}
+        {{- include "meet.storageClass" .Values.redis.embedded.persistence.storageClass | nindent 8 }}
+        resources:
+          requests:
+            storage: {{ .Values.redis.embedded.persistence.size }}
+  {{- end }}
+{{- end }}

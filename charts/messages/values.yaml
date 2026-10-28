@@ -1,0 +1,471 @@
+nameOverride: ""
+fullnameOverride: ""
+
+host: ""
+technicalDomain: ""
+existingSecret: ""
+imagePullSecrets: []
+
+images:
+  backend:
+    repository: ghcr.io/suitenumerique/messages-backend
+    tag: "0.10.0"
+    digest: ""
+    pullPolicy: IfNotPresent
+  frontend:
+    repository: ghcr.io/suitenumerique/messages-frontend
+    tag: "0.10.0"
+    digest: ""
+    pullPolicy: IfNotPresent
+  mta:
+    repository: ghcr.io/suitenumerique/messages-mta-in-py
+    tag: "0.10.0"
+    digest: ""
+    pullPolicy: IfNotPresent
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+  automountServiceAccountToken: false
+
+podAnnotations: {}
+podLabels: {}
+
+config:
+  djangoConfiguration: Production
+  djangoSettingsModule: messages.settings
+  logLevel: INFO
+  spamConfig: "{}"
+  featureMailboxAdminChannels: api_key,widget,webhook
+  enablePrometheus: false
+  extraEnv: {}
+
+oidc:
+  enabled: false
+  authorizationEndpoint: ""
+  tokenEndpoint: ""
+  userEndpoint: ""
+  jwksEndpoint: ""
+  logoutEndpoint: ""
+  clientId: ""
+  signAlgorithm: RS256
+  scopes: openid email profile
+  authRequestExtraParams: "{}"
+
+smtp:
+  enabled: false
+  relayHost: ""
+  relayPort: 587
+  username: ""
+  tlsSecurityLevel: secure
+
+postgresql:
+  mode: cnpg
+  database: messages
+  user: messages
+  port: 5432
+  cnpg:
+    instances: 1
+    image: ghcr.io/cloudnative-pg/postgresql:16
+    storageClass: ""
+    size: 30Gi
+    bootstrapSecretName: ""
+    resources: {}
+  external:
+    host: ""
+    database: ""
+    user: ""
+    port: 5432
+
+redis:
+  mode: embedded
+  embedded:
+    image:
+      repository: redis
+      tag: 8.8-alpine
+      digest: ""
+      pullPolicy: IfNotPresent
+    persistence:
+      enabled: true
+      storageClass: ""
+      accessModes: [ReadWriteOnce]
+      size: 5Gi
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        memory: 1Gi
+    podSecurityContext:
+      runAsNonRoot: true
+      runAsUser: 999
+      runAsGroup: 999
+      fsGroup: 999
+      seccompProfile:
+        type: RuntimeDefault
+    securityContext:
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: false
+      capabilities:
+        drop: [ALL]
+    probes:
+      readiness:
+        periodSeconds: 10
+        timeoutSeconds: 5
+        failureThreshold: 6
+      liveness:
+        initialDelaySeconds: 30
+        periodSeconds: 20
+        timeoutSeconds: 5
+        failureThreshold: 6
+  external:
+    url: ""
+    celeryBrokerUrl: ""
+
+opensearch:
+  mode: embedded
+  embedded:
+    image:
+      repository: opensearchproject/opensearch
+      tag: 2.19.2
+      digest: ""
+      pullPolicy: IfNotPresent
+    javaOpts: -Xms1g -Xmx1g
+    persistence:
+      enabled: true
+      storageClass: ""
+      accessModes: [ReadWriteOnce]
+      size: 30Gi
+    resources:
+      requests:
+        cpu: 200m
+        memory: 2Gi
+      limits:
+        memory: 3Gi
+    podSecurityContext:
+      runAsNonRoot: true
+      runAsUser: 1000
+      runAsGroup: 1000
+      fsGroup: 1000
+      seccompProfile:
+        type: RuntimeDefault
+    securityContext:
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: false
+      capabilities:
+        drop: [ALL]
+    probes:
+      readiness:
+        periodSeconds: 10
+        timeoutSeconds: 5
+        failureThreshold: 12
+      liveness:
+        initialDelaySeconds: 60
+        periodSeconds: 20
+        timeoutSeconds: 5
+        failureThreshold: 6
+  external:
+    url: ""
+
+s3:
+  mode: embedded
+  region: us-east-1
+  signatureVersion: s3v4
+  imports:
+    endpoint: ""
+    bucket: messages-imports
+  blobs:
+    endpoint: ""
+    bucket: messages-blobs
+  embedded:
+    image:
+      repository: dxflrs/garage
+      tag: v2.4.1
+      digest: sha256:9c96caa2612d3411acc5b0e6701fb238dbfba33e533a6d7d3d811a4b12d0d020
+      pullPolicy: IfNotPresent
+    s3Port: 3900
+    rpcPort: 3901
+    adminPort: 3903
+    replicationFactor: 1
+    zone: dc1
+    capacity: 100GB
+    rootDomain: .s3.garage.localhost
+    persistence:
+      enabled: true
+      storageClass: ""
+      accessModes: [ReadWriteOnce]
+      size: 100Gi
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        memory: 2Gi
+    podSecurityContext:
+      runAsNonRoot: true
+      runAsUser: 1000
+      runAsGroup: 1000
+      fsGroup: 1000
+      seccompProfile:
+        type: RuntimeDefault
+    securityContext:
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: false
+      capabilities:
+        drop: [ALL]
+    probes:
+      readiness:
+        periodSeconds: 10
+        timeoutSeconds: 5
+        failureThreshold: 12
+      liveness:
+        initialDelaySeconds: 30
+        periodSeconds: 20
+        timeoutSeconds: 5
+        failureThreshold: 6
+  external:
+    importsEndpoint: ""
+    blobsEndpoint: ""
+
+secretKeys:
+  s3ImportsAccessKey: AWS_ACCESS_KEY_ID
+  s3ImportsSecretKey: AWS_SECRET_ACCESS_KEY
+  s3BlobsAccessKey: AWS_ACCESS_KEY_ID
+  s3BlobsSecretKey: AWS_SECRET_ACCESS_KEY
+  garageRpcSecret: GARAGE_RPC_SECRET
+  garageAdminToken: GARAGE_ADMIN_TOKEN
+  mdaApiSecret: MDA_API_SECRET
+
+backend:
+  replicas: 1
+  service:
+    port: 8000
+  resources:
+    requests:
+      cpu: 100m
+      memory: 512Mi
+    limits:
+      memory: 2Gi
+  podSecurityContext:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: false
+    capabilities:
+      drop: [ALL]
+  probes:
+    readiness:
+      enabled: true
+      path: /__heartbeat__/
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 6
+    liveness:
+      enabled: true
+      initialDelaySeconds: 30
+      periodSeconds: 20
+      timeoutSeconds: 5
+      failureThreshold: 6
+
+worker:
+  replicas: 1
+  concurrency: 4
+  resources:
+    requests:
+      cpu: 100m
+      memory: 512Mi
+    limits:
+      memory: 3Gi
+  podSecurityContext:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: false
+    capabilities:
+      drop: [ALL]
+
+frontend:
+  replicas: 1
+  trustedProxies: ""
+  service:
+    port: 8080
+  resources:
+    requests:
+      cpu: 20m
+      memory: 32Mi
+    limits:
+      memory: 256Mi
+  podSecurityContext:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop: [ALL]
+  probes:
+    readiness:
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 6
+    liveness:
+      initialDelaySeconds: 30
+      periodSeconds: 20
+      timeoutSeconds: 5
+      failureThreshold: 6
+
+migration:
+  enabled: true
+  backoffLimit: 10
+  activeDeadlineSeconds: 900
+  ttlSecondsAfterFinished: 300
+  retry:
+    maxAttempts: 90
+    delaySeconds: 2
+  resources: {}
+  podSecurityContext:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: false
+    capabilities:
+      drop: [ALL]
+
+garageInit:
+  enabled: true
+  image:
+    repository: alpine/k8s
+    tag: "1.31.4"
+    digest: ""
+    pullPolicy: IfNotPresent
+  backoffLimit: 6
+  activeDeadlineSeconds: 600
+  ttlSecondsAfterFinished: 300
+  retry:
+    maxAttempts: 60
+    delaySeconds: 2
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
+    seccompProfile:
+      type: RuntimeDefault
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop: [ALL]
+
+mta:
+  enabled: false
+  replicas: 1
+  hostname: ""
+  tls:
+    enabled: false
+    secretName: ""
+  service:
+    type: LoadBalancer
+    port: 25
+    externalTrafficPolicy: Local
+    loadBalancerIP: ""
+    annotations: {}
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      memory: 512Mi
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 65532
+    runAsGroup: 65532
+    seccompProfile:
+      type: RuntimeDefault
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop: [ALL]
+  probes:
+    readiness:
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 6
+    liveness:
+      initialDelaySeconds: 30
+      periodSeconds: 20
+      timeoutSeconds: 5
+      failureThreshold: 6
+
+routing:
+  type: ingress
+  ingress:
+    className: ""
+    annotations: {}
+    tls:
+      enabled: true
+      secretName: ""
+  gateway:
+    parentRefs: []
+    annotations: {}
+    nginxPolicy:
+      enabled: false
+      apiVersion: gateway.nginx.org/v1alpha1
+      maxBodySize: 100m
+
+certificate:
+  enabled: false
+  apiVersion: cert-manager.io/v1
+  secretName: ""
+  issuerRef:
+    kind: ClusterIssuer
+    name: ""
+
+dns:
+  enabled: false
+  apiVersion: externaldns.k8s.io/v1alpha1
+  namespace: ""
+  ttl: 3600
+  address: ""
+  mx:
+    enabled: false
+    priority: 10
+  spf:
+    enabled: false
+    value: ""
+  dkim:
+    enabled: false
+    selector: ""
+    value: ""
+
+network:
+  metallb:
+    enabled: false
+    apiVersion: metallb.io/v1beta1
+    namespace: metallb-system
+    addresses: []
+    autoAssign: false
+    l2Advertisement:
+      enabled: false
+      interfaces: []
+  antreaEgress:
+    enabled: false
+    apiVersion: crd.antrea.io/v1beta1
+    egressIP: ""
+    externalIPPool: ""
+
+tests:
+  enabled: true
+  image:
+    repository: busybox
+    tag: "1.37"
+    digest: ""
+    pullPolicy: IfNotPresent

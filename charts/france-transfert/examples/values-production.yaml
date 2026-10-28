@@ -1,0 +1,89 @@
+host: transfert.example.org
+existingSecret: france-transfert-production-secrets
+
+oidc:
+  enabled: true
+  issuerUrl: https://identity.example.org/realms/services
+  clientId: france-transfert
+  resourceServerIssuerUrl: https://identity.example.org/realms/services
+
+smtp:
+  enabled: true
+  host: smtp.example.org
+  port: 587
+  from: no-reply@example.org
+  auth: true
+  ssl: false
+  startTls: true
+  healthcheck:
+    enabled: true
+    type: smtp
+
+redis:
+  embedded:
+    enabled: false
+  external:
+    host: redis.example.org
+    port: 6379
+    sentinel:
+      enabled: false
+
+s3:
+  embedded:
+    enabled: false
+  external:
+    # Ce service doit accepter la signature S3 SigV2.
+    endpoint: https://objects.example.org
+  region: eu-west-2
+  environment: production
+  expose:
+    enabled: false
+
+clamav:
+  embedded:
+    enabled: false
+  external:
+    host: clamav.example.org
+    port: 3310
+
+front:
+  replicas: 2
+
+upload:
+  replicas: 2
+
+download:
+  replicas: 2
+
+worker:
+  # Une seule réplique avec le volume RWO ci-dessous. Plusieurs répliques
+  # exigent un stockage ReadWriteMany explicitement provisionné et validé.
+  replicas: 1
+  work:
+    persistence:
+      enabled: true
+      storageClass: fast-retain
+      size: 100Gi
+
+routing:
+  type: gateway
+  externalDNS:
+    enabled: true
+    annotations:
+      external-dns.alpha.kubernetes.io/ttl: "300"
+  gateway:
+    parentRefs:
+      - name: public-gateway
+        namespace: gateway-system
+        sectionName: https
+    clientSettingsPolicy:
+      enabled: true
+      apiVersion: gateway.nginx.org/v1alpha1
+      maxBodySize: 200m
+
+initialize:
+  # Les services externes peuvent être initialisés hors de ce chart.
+  s3:
+    enabled: false
+  redis:
+    enabled: true

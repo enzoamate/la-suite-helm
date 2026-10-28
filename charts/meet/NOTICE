@@ -1,0 +1,17 @@
+Meet/Visio
+
+Ce chart est une adaptation autonome du chart Helm officiel Meet 0.0.29,
+inclus dans la release v1.36.3 du projet numerique-gouv/meet :
+https://github.com/numerique-gouv/meet/tree/v1.36.3/src/helm/meet
+
+Révision amont consultée :
+85670a02d510d25962f6cfc98c259931aac69f48
+
+Les structures de déploiement du backend, du frontend, du worker Celery et de
+la migration sont adaptées des modèles amont. Le routage, les services
+embarqués, le schéma de valeurs, les exemples et la documentation ont été
+remaniés pour rendre ce chart autonome et générique.
+
+Le code amont est distribué sous licence MIT. Le texte original est conservé
+dans LICENSE et LICENSES/MIT.txt. Les images référencées restent soumises à leurs
+licences respectives et ne sont pas redistribuées avec ce chart.

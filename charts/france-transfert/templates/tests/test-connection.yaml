@@ -1,0 +1,41 @@
+{{- if .Values.tests.enabled }}
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ include "france-transfert.fullname" . }}-test-connection
+  labels:
+    {{- include "france-transfert.labels" . | nindent 4 }}
+    app.kubernetes.io/component: test
+  annotations:
+    helm.sh/hook: test
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  restartPolicy: Never
+  serviceAccountName: {{ include "france-transfert.serviceAccountName" . }}
+  automountServiceAccountToken: false
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 65534
+    runAsGroup: 65534
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: connection
+      image: {{ include "france-transfert.image" .Values.tests.image | quote }}
+      imagePullPolicy: {{ .Values.tests.image.pullPolicy }}
+      command:
+        - /bin/sh
+        - -ec
+      args:
+        - |
+          wget -qO- --timeout=10 http://{{ include "france-transfert.fullname" . }}-front:{{ .Values.front.service.port }}/ >/dev/null
+          wget -qO- --timeout=10 http://{{ include "france-transfert.fullname" . }}-upload:{{ .Values.upload.service.managementPort }}/actuator/health >/dev/null
+          wget -qO- --timeout=10 http://{{ include "france-transfert.fullname" . }}-download:{{ .Values.download.service.managementPort }}/actuator/health >/dev/null
+      resources: {}
+      securityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop:
+            - ALL
+{{- end }}

@@ -1,0 +1,666 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "title": "Valeurs du chart La Suite Messages",
+  "definitions": {
+    "image": {
+      "type": "object",
+      "properties": {
+        "repository": { "type": "string", "minLength": 1 },
+        "tag": { "type": "string", "minLength": 1 },
+        "digest": {
+          "type": "string",
+          "pattern": "^$|^sha256:[a-f0-9]{64}$"
+        },
+        "pullPolicy": {
+          "type": "string",
+          "enum": ["Always", "IfNotPresent", "Never"]
+        }
+      }
+    }
+  },
+  "type": "object",
+  "required": ["host", "existingSecret"],
+  "properties": {
+    "host": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$"
+    },
+    "technicalDomain": {
+      "type": "string",
+      "pattern": "^$|^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$"
+    },
+    "existingSecret": {
+      "type": "string",
+      "minLength": 1
+    },
+    "images": {
+      "type": "object",
+      "properties": {
+        "backend": { "$ref": "#/definitions/image" },
+        "frontend": { "$ref": "#/definitions/image" },
+        "mta": { "$ref": "#/definitions/image" }
+      }
+    },
+    "secretKeys": {
+      "type": "object",
+      "properties": {
+        "s3ImportsAccessKey": { "type": "string", "minLength": 1 },
+        "s3ImportsSecretKey": { "type": "string", "minLength": 1 },
+        "s3BlobsAccessKey": { "type": "string", "minLength": 1 },
+        "s3BlobsSecretKey": { "type": "string", "minLength": 1 },
+        "garageRpcSecret": { "type": "string", "minLength": 1 },
+        "garageAdminToken": { "type": "string", "minLength": 1 }
+      }
+    },
+    "oidc": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "authorizationEndpoint": { "type": "string" },
+        "tokenEndpoint": { "type": "string" },
+        "userEndpoint": { "type": "string" },
+        "jwksEndpoint": { "type": "string" },
+        "logoutEndpoint": { "type": "string" },
+        "clientId": { "type": "string" }
+      }
+    },
+    "smtp": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "relayHost": { "type": "string" },
+        "relayPort": { "type": "integer", "minimum": 1, "maximum": 65535 },
+        "username": { "type": "string" }
+      }
+    },
+    "postgresql": {
+      "type": "object",
+      "properties": {
+        "mode": { "type": "string", "enum": ["cnpg", "external"] },
+        "cnpg": {
+          "type": "object",
+          "properties": {
+            "bootstrapSecretName": { "type": "string" }
+          }
+        },
+        "external": {
+          "type": "object",
+          "properties": {
+            "host": { "type": "string" },
+            "database": { "type": "string" },
+            "user": { "type": "string" },
+            "port": { "type": "integer", "minimum": 1, "maximum": 65535 }
+          }
+        }
+      }
+    },
+    "redis": {
+      "type": "object",
+      "properties": {
+        "mode": { "type": "string", "enum": ["embedded", "external"] },
+        "embedded": {
+          "type": "object",
+          "properties": {
+            "image": { "$ref": "#/definitions/image" }
+          }
+        },
+        "external": {
+          "type": "object",
+          "properties": {
+            "url": { "type": "string" },
+            "celeryBrokerUrl": { "type": "string" }
+          }
+        }
+      }
+    },
+    "opensearch": {
+      "type": "object",
+      "properties": {
+        "mode": { "type": "string", "enum": ["embedded", "external"] },
+        "embedded": {
+          "type": "object",
+          "properties": {
+            "image": { "$ref": "#/definitions/image" }
+          }
+        },
+        "external": {
+          "type": "object",
+          "properties": {
+            "url": { "type": "string" }
+          }
+        }
+      }
+    },
+    "s3": {
+      "type": "object",
+      "properties": {
+        "mode": { "type": "string", "enum": ["embedded", "external"] },
+        "embedded": {
+          "type": "object",
+          "properties": {
+            "image": { "$ref": "#/definitions/image" },
+            "s3Port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+            "rpcPort": { "type": "integer", "minimum": 1, "maximum": 65535 },
+            "adminPort": { "type": "integer", "minimum": 1, "maximum": 65535 },
+            "replicationFactor": { "type": "integer", "minimum": 1 },
+            "zone": { "type": "string", "minLength": 1 },
+            "capacity": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]*(B|KB|MB|GB|TB|PB)$"
+            },
+            "rootDomain": { "type": "string", "minLength": 1 }
+          }
+        },
+        "imports": {
+          "type": "object",
+          "properties": {
+            "endpoint": { "type": "string" },
+            "bucket": { "type": "string", "minLength": 1 }
+          }
+        },
+        "blobs": {
+          "type": "object",
+          "properties": {
+            "endpoint": { "type": "string" },
+            "bucket": { "type": "string", "minLength": 1 }
+          }
+        },
+        "external": {
+          "type": "object",
+          "properties": {
+            "importsEndpoint": { "type": "string" },
+            "blobsEndpoint": { "type": "string" }
+          }
+        }
+      }
+    },
+    "mta": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "hostname": { "type": "string" },
+        "tls": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "secretName": { "type": "string" }
+          }
+        }
+      }
+    },
+    "routing": {
+      "type": "object",
+      "properties": {
+        "type": { "type": "string", "enum": ["ingress", "gateway", "none"] },
+        "gateway": {
+          "type": "object",
+          "properties": {
+            "parentRefs": {
+              "type": "array",
+              "items": { "type": "object" }
+            }
+          }
+        }
+      }
+    },
+    "certificate": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "secretName": { "type": "string" },
+        "issuerRef": {
+          "type": "object",
+          "properties": {
+            "kind": { "type": "string" },
+            "name": { "type": "string" }
+          }
+        }
+      }
+    },
+    "dns": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "address": { "type": "string" },
+        "spf": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "value": { "type": "string" }
+          }
+        },
+        "dkim": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "selector": { "type": "string" },
+            "value": { "type": "string" }
+          }
+        }
+      }
+    },
+    "network": {
+      "type": "object",
+      "properties": {
+        "metallb": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "addresses": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1 }
+            }
+          }
+        },
+        "antreaEgress": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "egressIP": { "type": "string" },
+            "externalIPPool": { "type": "string" }
+          }
+        }
+      }
+    },
+    "migration": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "activeDeadlineSeconds": { "type": "integer", "minimum": 1 },
+        "retry": {
+          "type": "object",
+          "properties": {
+            "maxAttempts": { "type": "integer", "minimum": 1 },
+            "delaySeconds": { "type": "integer", "minimum": 1 }
+          }
+        }
+      }
+    },
+    "garageInit": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "image": { "$ref": "#/definitions/image" },
+        "activeDeadlineSeconds": { "type": "integer", "minimum": 1 },
+        "retry": {
+          "type": "object",
+          "properties": {
+            "maxAttempts": { "type": "integer", "minimum": 1 },
+            "delaySeconds": { "type": "integer", "minimum": 1 }
+          }
+        }
+      }
+    },
+    "tests": {
+      "type": "object",
+      "properties": {
+        "image": { "$ref": "#/definitions/image" }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "oidc": {
+            "properties": { "enabled": { "const": true } },
+            "required": ["enabled"]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "oidc": {
+            "required": ["authorizationEndpoint", "tokenEndpoint", "userEndpoint", "jwksEndpoint", "logoutEndpoint", "clientId"],
+            "properties": {
+              "authorizationEndpoint": { "minLength": 1 },
+              "tokenEndpoint": { "minLength": 1 },
+              "userEndpoint": { "minLength": 1 },
+              "jwksEndpoint": { "minLength": 1 },
+              "logoutEndpoint": { "minLength": 1 },
+              "clientId": { "minLength": 1 }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "smtp": {
+            "properties": { "enabled": { "const": true } },
+            "required": ["enabled"]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "smtp": {
+            "required": ["relayHost"],
+            "properties": { "relayHost": { "minLength": 1 } }
+          },
+          "technicalDomain": { "minLength": 1 }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "postgresql": { "properties": { "mode": { "const": "cnpg" } } } }
+      },
+      "then": {
+        "properties": {
+          "postgresql": {
+            "properties": {
+              "cnpg": {
+                "required": ["bootstrapSecretName"],
+                "properties": { "bootstrapSecretName": { "minLength": 1 } }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "postgresql": { "properties": { "mode": { "const": "external" } } } }
+      },
+      "then": {
+        "properties": {
+          "postgresql": {
+            "properties": {
+              "external": {
+                "required": ["host", "database", "user"],
+                "properties": {
+                  "host": { "minLength": 1 },
+                  "database": { "minLength": 1 },
+                  "user": { "minLength": 1 }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "redis": { "properties": { "mode": { "const": "external" } } } }
+      },
+      "then": {
+        "properties": {
+          "redis": {
+            "properties": {
+              "external": {
+                "required": ["url"],
+                "properties": { "url": { "minLength": 1 } }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "opensearch": { "properties": { "mode": { "const": "external" } } } }
+      },
+      "then": {
+        "properties": {
+          "opensearch": {
+            "properties": {
+              "external": {
+                "required": ["url"],
+                "properties": { "url": { "minLength": 1 } }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "s3": { "properties": { "mode": { "const": "external" } } } }
+      },
+      "then": {
+        "properties": {
+          "s3": {
+            "properties": {
+              "external": {
+                "required": ["importsEndpoint", "blobsEndpoint"],
+                "properties": {
+                  "importsEndpoint": { "minLength": 1 },
+                  "blobsEndpoint": { "minLength": 1 }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "routing": {
+            "properties": { "type": { "const": "gateway" } },
+            "required": ["type"]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "routing": {
+            "properties": {
+              "gateway": {
+                "properties": { "parentRefs": { "minItems": 1 } }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "mta": {
+            "properties": { "enabled": { "const": true } },
+            "required": ["enabled"]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "mta": {
+            "required": ["hostname"],
+            "properties": { "hostname": { "minLength": 1 } }
+          },
+          "technicalDomain": { "minLength": 1 }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "mta": {
+            "properties": {
+              "tls": {
+                "properties": { "enabled": { "const": true } },
+                "required": ["enabled"]
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "mta": {
+            "properties": {
+              "tls": {
+                "required": ["secretName"],
+                "properties": { "secretName": { "minLength": 1 } }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "certificate": {
+            "properties": { "enabled": { "const": true } },
+            "required": ["enabled"]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "certificate": {
+            "required": ["secretName", "issuerRef"],
+            "properties": {
+              "secretName": { "minLength": 1 },
+              "issuerRef": {
+                "required": ["name"],
+                "properties": { "name": { "minLength": 1 } }
+              }
+            }
+          },
+          "mta": {
+            "required": ["hostname"],
+            "properties": { "hostname": { "minLength": 1 } }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "dns": {
+            "properties": { "enabled": { "const": true } },
+            "required": ["enabled"]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "dns": {
+            "required": ["address"],
+            "properties": { "address": { "minLength": 1 } }
+          },
+          "mta": {
+            "required": ["hostname"],
+            "properties": { "hostname": { "minLength": 1 } }
+          },
+          "technicalDomain": { "minLength": 1 }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "dns": {
+            "properties": {
+              "spf": {
+                "properties": { "enabled": { "const": true } },
+                "required": ["enabled"]
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "dns": {
+            "properties": {
+              "spf": {
+                "required": ["value"],
+                "properties": { "value": { "minLength": 1 } }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "dns": {
+            "properties": {
+              "dkim": {
+                "properties": { "enabled": { "const": true } },
+                "required": ["enabled"]
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "dns": {
+            "properties": {
+              "dkim": {
+                "required": ["selector", "value"],
+                "properties": {
+                  "selector": { "minLength": 1 },
+                  "value": { "minLength": 1 }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "network": {
+            "properties": {
+              "metallb": {
+                "properties": { "enabled": { "const": true } },
+                "required": ["enabled"]
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "network": {
+            "properties": {
+              "metallb": {
+                "properties": { "addresses": { "minItems": 1 } }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "network": {
+            "properties": {
+              "antreaEgress": {
+                "properties": { "enabled": { "const": true } },
+                "required": ["enabled"]
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "network": {
+            "properties": {
+              "antreaEgress": {
+                "required": ["egressIP", "externalIPPool"],
+                "properties": {
+                  "egressIP": { "minLength": 1 },
+                  "externalIPPool": { "minLength": 1 }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

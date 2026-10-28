@@ -1,0 +1,66 @@
+{{- if .Values.migrations.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "meet.fullname" . }}-migrate
+  labels:
+    {{- include "meet.labels" . | nindent 4 }}
+    app.kubernetes.io/component: migrations
+  {{- if .Release.IsUpgrade }}
+  annotations:
+    helm.sh/hook: pre-upgrade
+    helm.sh/hook-weight: "0"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+  {{- end }}
+spec:
+  ttlSecondsAfterFinished: {{ .Values.migrations.ttlSecondsAfterFinished }}
+  backoffLimit: {{ .Values.migrations.backoffLimit }}
+  activeDeadlineSeconds: {{ .Values.migrations.activeDeadlineSeconds }}
+  template:
+    metadata:
+      labels:
+        {{- include "meet.selectorLabels" (dict "root" . "component" "migrations") | nindent 8 }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/config.yaml") . | sha256sum }}
+    spec:
+      restartPolicy: Never
+      serviceAccountName: {{ include "meet.serviceAccountName" . }}
+      automountServiceAccountToken: {{ .Values.serviceAccount.automountServiceAccountToken }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.migrations.podSecurityContext | nindent 8 }}
+      containers:
+        - name: migrations
+          image: {{ include "meet.image" .Values.images.backend | quote }}
+          imagePullPolicy: {{ .Values.images.backend.pullPolicy }}
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              attempt=1
+              until python manage.py check --database default >/dev/null 2>&1; do
+                if [ "$attempt" -ge "$MAX_ATTEMPTS" ]; then
+                  echo "Base de données indisponible après ${attempt} tentatives" >&2
+                  exit 1
+                fi
+                attempt=$((attempt + 1))
+                sleep "$RETRY_DELAY"
+              done
+              python manage.py migrate --no-input
+          envFrom:
+            - configMapRef:
+                name: {{ include "meet.fullname" . }}-config
+          env:
+            {{- include "meet.secretEnv" . | nindent 12 }}
+            - name: MAX_ATTEMPTS
+              value: {{ .Values.migrations.retry.maxAttempts | quote }}
+            - name: RETRY_DELAY
+              value: {{ .Values.migrations.retry.delaySeconds | quote }}
+          resources:
+            {{- toYaml .Values.migrations.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.migrations.securityContext | nindent 12 }}
+{{- end }}

@@ -1,0 +1,476 @@
+nameOverride: ""
+fullnameOverride: ""
+
+host: ""
+
+imagePullSecrets: []
+
+existingSecret: ""
+
+images:
+  front:
+    repository: lasuite/francetransfert-upload-download-gui
+    tag: "4.0.20"
+    pullPolicy: IfNotPresent
+  upload:
+    repository: lasuite/francetransfert-upload-api
+    tag: "4.0.20"
+    pullPolicy: IfNotPresent
+  download:
+    repository: lasuite/francetransfert-download-api
+    tag: "4.0.20"
+    pullPolicy: IfNotPresent
+  worker:
+    repository: lasuite/francetransfert-worker
+    tag: "4.0.20"
+    pullPolicy: IfNotPresent
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+  automountServiceAccountToken: false
+
+podAnnotations: {}
+podLabels: {}
+podSecurityContext:
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault
+
+config:
+  environment: PROD
+  logLevel: INFO
+  uploadLimit: "21474836480"
+  uploadFileLimit: "2147483648"
+  expireDays: "30"
+  maxRecipientsAgent: "100"
+  maxRecipientsPublic: "10"
+  bucketPrefix: ft-plis-
+  bucketSequestre: ft-sequestre
+  bucketExport: ft-export
+  timezone: Europe/Paris
+  extraEnv: {}
+
+oidc:
+  enabled: false
+  issuerUrl: ""
+  clientId: ""
+  resourceServerIssuerUrl: ""
+
+smtp:
+  enabled: false
+  host: ""
+  port: 587
+  from: ""
+  auth: true
+  ssl: false
+  startTls: true
+  healthcheck:
+    enabled: false
+    type: smtp
+
+redis:
+  embedded:
+    enabled: true
+    image:
+      repository: redis
+      tag: 8.2-alpine
+      pullPolicy: IfNotPresent
+    persistence:
+      enabled: true
+      storageClass: ""
+      accessModes:
+        - ReadWriteOnce
+      size: 20Gi
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        memory: 2Gi
+    podSecurityContext:
+      runAsNonRoot: true
+      runAsUser: 999
+      runAsGroup: 999
+      fsGroup: 999
+      seccompProfile:
+        type: RuntimeDefault
+    securityContext:
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
+      capabilities:
+        drop:
+          - ALL
+    probes:
+      readiness:
+        periodSeconds: 10
+        timeoutSeconds: 5
+        failureThreshold: 6
+      liveness:
+        initialDelaySeconds: 30
+        periodSeconds: 20
+        timeoutSeconds: 5
+        failureThreshold: 6
+  external:
+    host: ""
+    port: 6379
+    sentinel:
+      enabled: false
+      nodes: ""
+      masterName: mymaster
+
+s3:
+  embedded:
+    enabled: true
+    # France Transfert 4.0.20 impose SigV2 ; CloudServer est utilisé pour cette raison.
+    image:
+      repository: zenko/cloudserver
+      tag: "latest"
+      digest: sha256:b53e57829cf7df357323e60a19c9f98d2218f1b7ccb1d7cea5761a5a227a9ee3
+      pullPolicy: IfNotPresent
+    initImage:
+      repository: busybox
+      tag: "1.37"
+      pullPolicy: IfNotPresent
+    initSecurityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+          - ALL
+    endpointHostnames: []
+    persistence:
+      enabled: true
+      storageClass: ""
+      accessModes:
+        - ReadWriteOnce
+      size: 200Gi
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        memory: 2Gi
+    podSecurityContext:
+      runAsNonRoot: true
+      runAsUser: 1000
+      runAsGroup: 1000
+      fsGroup: 1000
+      seccompProfile:
+        type: RuntimeDefault
+    securityContext:
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: false
+      capabilities:
+        drop:
+          - ALL
+    probes:
+      startup:
+        failureThreshold: 30
+        periodSeconds: 10
+      readiness:
+        periodSeconds: 10
+      liveness:
+        periodSeconds: 20
+  external:
+    endpoint: ""
+  region: eu-west-2
+  environment: default
+  expose:
+    enabled: false
+    host: ""
+
+clamav:
+  embedded:
+    enabled: true
+    image:
+      repository: clamav/clamav
+      tag: stable_base
+      digest: sha256:a01a78acf14e356f9d95c0eeb640ac9fa48a98a59933dea877f5a4d01573a0eb
+      pullPolicy: IfNotPresent
+    persistence:
+      enabled: true
+      storageClass: ""
+      accessModes:
+        - ReadWriteOnce
+      size: 5Gi
+    resources:
+      requests:
+        cpu: 200m
+        memory: 2Gi
+      limits:
+        memory: 4Gi
+    podSecurityContext:
+      runAsNonRoot: true
+      runAsUser: 100
+      runAsGroup: 101
+      fsGroup: 101
+      seccompProfile:
+        type: RuntimeDefault
+    securityContext:
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: false
+      capabilities:
+        drop:
+          - ALL
+    probes:
+      startup:
+        failureThreshold: 60
+        periodSeconds: 10
+      readiness:
+        periodSeconds: 10
+      liveness:
+        periodSeconds: 30
+  external:
+    host: ""
+    port: 3310
+
+front:
+  replicas: 1
+  service:
+    type: ClusterIP
+    port: 8080
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      memory: 256Mi
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 100101
+    runAsGroup: 100101
+    fsGroup: 100101
+    seccompProfile:
+      type: RuntimeDefault
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
+  probes:
+    startup:
+      enabled: false
+      path: /
+      failureThreshold: 30
+      periodSeconds: 10
+    readiness:
+      enabled: true
+      path: /
+      periodSeconds: 10
+    liveness:
+      enabled: true
+      path: /
+      initialDelaySeconds: 30
+      periodSeconds: 20
+  tmp:
+    sizeLimit: 250Mi
+
+upload:
+  replicas: 1
+  service:
+    type: ClusterIP
+    port: 8080
+    managementPort: 8880
+  resources:
+    requests:
+      cpu: 250m
+      memory: 1Gi
+    limits:
+      memory: 2Gi
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 100102
+    runAsGroup: 100102
+    fsGroup: 100102
+    seccompProfile:
+      type: RuntimeDefault
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
+  probes:
+    startup:
+      enabled: true
+      path: /actuator/health
+      failureThreshold: 60
+      periodSeconds: 10
+    readiness:
+      enabled: true
+      path: /actuator/health
+      periodSeconds: 10
+    liveness:
+      enabled: true
+      path: /actuator/health
+      periodSeconds: 30
+  work:
+    sizeLimit: 25Gi
+
+download:
+  replicas: 1
+  service:
+    type: ClusterIP
+    port: 8081
+    managementPort: 8180
+  resources:
+    requests:
+      cpu: 150m
+      memory: 512Mi
+    limits:
+      memory: 1Gi
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 100103
+    runAsGroup: 100103
+    fsGroup: 100103
+    seccompProfile:
+      type: RuntimeDefault
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
+  probes:
+    startup:
+      enabled: true
+      path: /actuator/health
+      failureThreshold: 60
+      periodSeconds: 10
+    readiness:
+      enabled: true
+      path: /actuator/health
+      periodSeconds: 10
+    liveness:
+      enabled: true
+      path: /actuator/health
+      periodSeconds: 30
+  tmp:
+    sizeLimit: 250Mi
+  work:
+    sizeLimit: 1Gi
+
+worker:
+  replicas: 1
+  managementPort: 8380
+  resources:
+    requests:
+      cpu: 250m
+      memory: 1Gi
+    limits:
+      memory: 3Gi
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 100104
+    runAsGroup: 100104
+    fsGroup: 100104
+    seccompProfile:
+      type: RuntimeDefault
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
+  probes:
+    startup:
+      enabled: true
+      path: /actuator/health
+      failureThreshold: 90
+      periodSeconds: 10
+    readiness:
+      enabled: true
+      path: /actuator/health
+      periodSeconds: 15
+    liveness:
+      enabled: true
+      path: /actuator/health
+      periodSeconds: 30
+  work:
+    persistence:
+      enabled: false
+      storageClass: ""
+      accessModes:
+        - ReadWriteOnce
+      size: 25Gi
+    sizeLimit: 25Gi
+
+routing:
+  type: ingress
+  externalDNS:
+    enabled: false
+    annotations: {}
+  ingress:
+    className: ""
+    annotations: {}
+    tls:
+      enabled: true
+      secretName: ""
+  gateway:
+    parentRefs: []
+    annotations: {}
+    clientSettingsPolicy:
+      enabled: false
+      apiVersion: gateway.nginx.org/v1alpha1
+      maxBodySize: 200m
+      s3MaxBodySize: 3g
+
+initialize:
+  enabled: true
+  s3:
+    enabled: true
+  redis:
+    enabled: true
+  backoffLimit: 10
+  activeDeadlineSeconds: 600
+  ttlSecondsAfterFinished: 300
+  retry:
+    maxAttempts: 60
+    delaySeconds: 2
+  timeouts:
+    s3ConnectSeconds: 5
+    s3ReadSeconds: 10
+    redisSeconds: 5
+  serviceAccount:
+    create: true
+    name: ""
+    annotations: {}
+  s3Image:
+    repository: amazon/aws-cli
+    tag: 2.32.5
+    pullPolicy: IfNotPresent
+  redisImage:
+    repository: redis
+    tag: 8.2-alpine
+    pullPolicy: IfNotPresent
+  s3PodSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
+    seccompProfile:
+      type: RuntimeDefault
+  redisPodSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 999
+    runAsGroup: 999
+    seccompProfile:
+      type: RuntimeDefault
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
+  tmp:
+    sizeLimit: 64Mi
+  resources: {}
+
+tests:
+  enabled: true
+  image:
+    repository: busybox
+    tag: "1.37"
+    pullPolicy: IfNotPresent

@@ -1,0 +1,72 @@
+{{- if eq .Values.routing.type "gateway" }}
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ include "messages.fullname" . }}
+  labels:
+    {{- include "messages.labels" . | nindent 4 }}
+  {{- with .Values.routing.gateway.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  parentRefs:
+    {{- toYaml .Values.routing.gateway.parentRefs | nindent 4 }}
+  hostnames:
+    - {{ .Values.host | quote }}
+  rules:
+    - backendRefs:
+        - name: {{ include "messages.fullname" . }}-frontend
+          port: {{ .Values.frontend.service.port }}
+{{- if .Values.routing.gateway.nginxPolicy.enabled }}
+---
+apiVersion: {{ .Values.routing.gateway.nginxPolicy.apiVersion }}
+kind: ClientSettingsPolicy
+metadata:
+  name: {{ include "messages.fullname" . }}
+  labels:
+    {{- include "messages.labels" . | nindent 4 }}
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: {{ include "messages.fullname" . }}
+  body:
+    maxSize: {{ .Values.routing.gateway.nginxPolicy.maxBodySize | quote }}
+{{- end }}
+{{- end }}
+{{- if eq .Values.routing.type "ingress" }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "messages.fullname" . }}
+  labels:
+    {{- include "messages.labels" . | nindent 4 }}
+  {{- with .Values.routing.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- with .Values.routing.ingress.className }}
+  ingressClassName: {{ . | quote }}
+  {{- end }}
+  {{- if .Values.routing.ingress.tls.enabled }}
+  tls:
+    - hosts:
+        - {{ .Values.host | quote }}
+      {{- with .Values.routing.ingress.tls.secretName }}
+      secretName: {{ . | quote }}
+      {{- end }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.host | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "messages.fullname" . }}-frontend
+                port:
+                  number: {{ .Values.frontend.service.port }}
+{{- end }}

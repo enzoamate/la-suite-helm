@@ -1,0 +1,73 @@
+{{- if .Values.serviceAccount.create }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "messages.serviceAccountName" . }}
+  labels:
+    {{- include "messages.labels" . | nindent 4 }}
+  {{- with .Values.serviceAccount.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+automountServiceAccountToken: {{ .Values.serviceAccount.automountServiceAccountToken }}
+---
+{{- end }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "messages.fullname" . }}-backend
+  labels:
+    {{- include "messages.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backend
+data:
+  DJANGO_CONFIGURATION: {{ .Values.config.djangoConfiguration | quote }}
+  DJANGO_SETTINGS_MODULE: {{ .Values.config.djangoSettingsModule | quote }}
+  DJANGO_ALLOWED_HOSTS: {{ printf "%s,%s-backend,%s-backend.%s.svc.cluster.local" .Values.host (include "messages.fullname" .) (include "messages.fullname" .) .Release.Namespace | quote }}
+  DJANGO_CSRF_TRUSTED_ORIGINS: {{ printf "https://%s" .Values.host | quote }}
+  DB_HOST: {{ include "messages.postgresqlHost" . | quote }}
+  DB_NAME: {{ include "messages.postgresqlDatabase" . | quote }}
+  DB_USER: {{ include "messages.postgresqlUser" . | quote }}
+  DB_PORT: {{ ternary .Values.postgresql.port .Values.postgresql.external.port (eq .Values.postgresql.mode "cnpg") | quote }}
+  REDIS_URL: {{ include "messages.redisUrl" . | quote }}
+  CELERY_BROKER_URL: {{ include "messages.celeryBrokerUrl" . | quote }}
+  OPENSEARCH_URL: {{ include "messages.opensearchUrl" . | quote }}
+  AWS_S3_ENDPOINT_URL: {{ include "messages.s3ImportsEndpoint" . | quote }}
+  AWS_S3_REGION_NAME: {{ .Values.s3.region | quote }}
+  AWS_S3_SIGNATURE_VERSION: {{ .Values.s3.signatureVersion | quote }}
+  STORAGE_MESSAGE_IMPORTS_ENDPOINT_URL: {{ include "messages.s3ImportsEndpoint" . | quote }}
+  STORAGE_MESSAGE_IMPORTS_BUCKET_NAME: {{ .Values.s3.imports.bucket | quote }}
+  STORAGE_MESSAGE_IMPORTS_REGION_NAME: {{ .Values.s3.region | quote }}
+  STORAGE_MESSAGE_BLOBS_ENDPOINT_URL: {{ include "messages.s3BlobsEndpoint" . | quote }}
+  STORAGE_MESSAGE_BLOBS_BUCKET_NAME: {{ .Values.s3.blobs.bucket | quote }}
+  STORAGE_MESSAGE_BLOBS_REGION_NAME: {{ .Values.s3.region | quote }}
+  MESSAGES_TECHNICAL_DOMAIN: {{ .Values.technicalDomain | quote }}
+  LOGIN_REDIRECT_URL: {{ printf "https://%s" .Values.host | quote }}
+  LOGIN_REDIRECT_URL_FAILURE: {{ printf "https://%s" .Values.host | quote }}
+  LOGOUT_REDIRECT_URL: {{ printf "https://%s" .Values.host | quote }}
+  OIDC_REDIRECT_ALLOWED_HOSTS: {{ .Values.host | quote }}
+  OIDC_RP_SIGN_ALGO: {{ .Values.oidc.signAlgorithm | quote }}
+  OIDC_RP_SCOPES: {{ .Values.oidc.scopes | quote }}
+  OIDC_AUTH_REQUEST_EXTRA_PARAMS: {{ .Values.oidc.authRequestExtraParams | quote }}
+  {{- if .Values.oidc.enabled }}
+  OIDC_OP_AUTHORIZATION_ENDPOINT: {{ .Values.oidc.authorizationEndpoint | quote }}
+  OIDC_OP_TOKEN_ENDPOINT: {{ .Values.oidc.tokenEndpoint | quote }}
+  OIDC_OP_USER_ENDPOINT: {{ .Values.oidc.userEndpoint | quote }}
+  OIDC_OP_JWKS_ENDPOINT: {{ .Values.oidc.jwksEndpoint | quote }}
+  OIDC_OP_LOGOUT_ENDPOINT: {{ .Values.oidc.logoutEndpoint | quote }}
+  OIDC_RP_CLIENT_ID: {{ .Values.oidc.clientId | quote }}
+  {{- end }}
+  {{- if .Values.smtp.enabled }}
+  MTA_OUT_MODE: relay
+  MTA_OUT_RELAY_HOST: {{ printf "%s:%v" .Values.smtp.relayHost .Values.smtp.relayPort | quote }}
+  MTA_OUT_RELAY_USERNAME: {{ .Values.smtp.username | quote }}
+  MTA_OUT_SMTP_TLS_SECURITY_LEVEL: {{ .Values.smtp.tlsSecurityLevel | quote }}
+  {{- end }}
+  SPAM_CONFIG: {{ .Values.config.spamConfig | quote }}
+  FEATURE_MAILBOX_ADMIN_CHANNELS: {{ .Values.config.featureMailboxAdminChannels | quote }}
+  LOGGING_LEVEL_HANDLERS_CONSOLE: {{ .Values.config.logLevel | quote }}
+  LOGGING_LEVEL_LOGGERS_ROOT: {{ .Values.config.logLevel | quote }}
+  LOGGING_LEVEL_LOGGERS_APP: {{ .Values.config.logLevel | quote }}
+  ENABLE_PROMETHEUS: {{ ternary "1" "0" .Values.config.enablePrometheus | quote }}
+  {{- range $key, $value := .Values.config.extraEnv }}
+  {{ $key }}: {{ $value | quote }}
+  {{- end }}

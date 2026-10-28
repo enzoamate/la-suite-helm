@@ -1,0 +1,260 @@
+{{- if eq .Values.routing.type "gateway" }}
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ include "france-transfert.fullname" . }}
+  labels:
+    {{- include "france-transfert.labels" . | nindent 4 }}
+  {{- if or .Values.routing.gateway.annotations .Values.routing.externalDNS.enabled }}
+  annotations:
+    {{- with .Values.routing.gateway.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+    {{- if .Values.routing.externalDNS.enabled }}
+    external-dns.alpha.kubernetes.io/hostname: {{ .Values.host | quote }}
+    {{- range $key, $value := .Values.routing.externalDNS.annotations }}
+    {{ $key }}: {{ $value | quote }}
+    {{- end }}
+    {{- end }}
+  {{- end }}
+spec:
+  parentRefs:
+    {{- toYaml .Values.routing.gateway.parentRefs | nindent 4 }}
+  hostnames:
+    - {{ .Values.host | quote }}
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /api-private/upload-module/
+        - path:
+            type: PathPrefix
+            value: /api-private/confirmation-module/
+        - path:
+            type: PathPrefix
+            value: /api-private/heathcheck/
+        - path:
+            type: PathPrefix
+            value: /api-public/
+      backendRefs:
+        - name: {{ include "france-transfert.fullname" . }}-upload
+          port: {{ .Values.upload.service.port }}
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /api-private/download-module/
+        - path:
+            type: PathPrefix
+            value: /api-public-dl/
+      backendRefs:
+        - name: {{ include "france-transfert.fullname" . }}-download
+          port: {{ .Values.download.service.port }}
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      filters:
+        - type: ResponseHeaderModifier
+          responseHeaderModifier:
+            set:
+              - name: X-Content-Type-Options
+                value: nosniff
+              - name: Referrer-Policy
+                value: strict-origin-when-cross-origin
+              - name: Strict-Transport-Security
+                value: max-age=31536000; includeSubDomains
+      backendRefs:
+        - name: {{ include "france-transfert.fullname" . }}-front
+          port: {{ .Values.front.service.port }}
+{{- if and .Values.s3.embedded.enabled .Values.s3.expose.enabled }}
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ include "france-transfert.fullname" . }}-s3
+  labels:
+    {{- include "france-transfert.labels" . | nindent 4 }}
+  {{- if or .Values.routing.gateway.annotations .Values.routing.externalDNS.enabled }}
+  annotations:
+    {{- with .Values.routing.gateway.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+    {{- if .Values.routing.externalDNS.enabled }}
+    external-dns.alpha.kubernetes.io/hostname: {{ .Values.s3.expose.host | quote }}
+    {{- range $key, $value := .Values.routing.externalDNS.annotations }}
+    {{ $key }}: {{ $value | quote }}
+    {{- end }}
+    {{- end }}
+  {{- end }}
+spec:
+  parentRefs:
+    {{- toYaml .Values.routing.gateway.parentRefs | nindent 4 }}
+  hostnames:
+    - {{ .Values.s3.expose.host | quote }}
+  rules:
+    - backendRefs:
+        - name: {{ include "france-transfert.fullname" . }}-s3
+          port: 8000
+{{- end }}
+{{- if .Values.routing.gateway.clientSettingsPolicy.enabled }}
+---
+apiVersion: {{ .Values.routing.gateway.clientSettingsPolicy.apiVersion }}
+kind: ClientSettingsPolicy
+metadata:
+  name: {{ include "france-transfert.fullname" . }}
+  labels:
+    {{- include "france-transfert.labels" . | nindent 4 }}
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: {{ include "france-transfert.fullname" . }}
+  body:
+    maxSize: {{ .Values.routing.gateway.clientSettingsPolicy.maxBodySize | quote }}
+{{- if and .Values.s3.embedded.enabled .Values.s3.expose.enabled }}
+---
+apiVersion: {{ .Values.routing.gateway.clientSettingsPolicy.apiVersion }}
+kind: ClientSettingsPolicy
+metadata:
+  name: {{ include "france-transfert.fullname" . }}-s3
+  labels:
+    {{- include "france-transfert.labels" . | nindent 4 }}
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: {{ include "france-transfert.fullname" . }}-s3
+  body:
+    maxSize: {{ .Values.routing.gateway.clientSettingsPolicy.s3MaxBodySize | quote }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- if eq .Values.routing.type "ingress" }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "france-transfert.fullname" . }}
+  labels:
+    {{- include "france-transfert.labels" . | nindent 4 }}
+  {{- if or .Values.routing.ingress.annotations .Values.routing.externalDNS.enabled }}
+  annotations:
+    {{- with .Values.routing.ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+    {{- if .Values.routing.externalDNS.enabled }}
+    external-dns.alpha.kubernetes.io/hostname: {{ .Values.host | quote }}
+    {{- range $key, $value := .Values.routing.externalDNS.annotations }}
+    {{ $key }}: {{ $value | quote }}
+    {{- end }}
+    {{- end }}
+  {{- end }}
+spec:
+  {{- with .Values.routing.ingress.className }}
+  ingressClassName: {{ . | quote }}
+  {{- end }}
+  {{- if .Values.routing.ingress.tls.enabled }}
+  tls:
+    - hosts:
+        - {{ .Values.host | quote }}
+      {{- with .Values.routing.ingress.tls.secretName }}
+      secretName: {{ . | quote }}
+      {{- end }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.host | quote }}
+      http:
+        paths:
+          - path: /api-private/upload-module/
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "france-transfert.fullname" . }}-upload
+                port:
+                  number: {{ .Values.upload.service.port }}
+          - path: /api-private/confirmation-module/
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "france-transfert.fullname" . }}-upload
+                port:
+                  number: {{ .Values.upload.service.port }}
+          - path: /api-private/heathcheck/
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "france-transfert.fullname" . }}-upload
+                port:
+                  number: {{ .Values.upload.service.port }}
+          - path: /api-public/
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "france-transfert.fullname" . }}-upload
+                port:
+                  number: {{ .Values.upload.service.port }}
+          - path: /api-private/download-module/
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "france-transfert.fullname" . }}-download
+                port:
+                  number: {{ .Values.download.service.port }}
+          - path: /api-public-dl/
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "france-transfert.fullname" . }}-download
+                port:
+                  number: {{ .Values.download.service.port }}
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "france-transfert.fullname" . }}-front
+                port:
+                  number: {{ .Values.front.service.port }}
+{{- if and .Values.s3.embedded.enabled .Values.s3.expose.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "france-transfert.fullname" . }}-s3
+  labels:
+    {{- include "france-transfert.labels" . | nindent 4 }}
+  {{- if or .Values.routing.ingress.annotations .Values.routing.externalDNS.enabled }}
+  annotations:
+    {{- with .Values.routing.ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+    {{- if .Values.routing.externalDNS.enabled }}
+    external-dns.alpha.kubernetes.io/hostname: {{ .Values.s3.expose.host | quote }}
+    {{- range $key, $value := .Values.routing.externalDNS.annotations }}
+    {{ $key }}: {{ $value | quote }}
+    {{- end }}
+    {{- end }}
+  {{- end }}
+spec:
+  {{- with .Values.routing.ingress.className }}
+  ingressClassName: {{ . | quote }}
+  {{- end }}
+  {{- if .Values.routing.ingress.tls.enabled }}
+  tls:
+    - hosts:
+        - {{ .Values.s3.expose.host | quote }}
+      {{- with .Values.routing.ingress.tls.secretName }}
+      secretName: {{ . | quote }}
+      {{- end }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.s3.expose.host | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "france-transfert.fullname" . }}-s3
+                port:
+                  number: 8000
+{{- end }}
+{{- end }}

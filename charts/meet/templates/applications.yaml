@@ -1,0 +1,342 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "meet.fullname" . }}-backend
+  labels:
+    {{- include "meet.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backend
+  {{- with .Values.backend.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  selector:
+    {{- include "meet.selectorLabels" (dict "root" . "component" "backend") | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.backend.service.port }}
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "meet.fullname" . }}-backend
+  labels:
+    {{- include "meet.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backend
+spec:
+  replicas: {{ .Values.backend.replicas }}
+  selector:
+    matchLabels:
+      {{- include "meet.selectorLabels" (dict "root" . "component" "backend") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "meet.selectorLabels" (dict "root" . "component" "backend") | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/config.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ include "meet.serviceAccountName" . }}
+      automountServiceAccountToken: {{ .Values.serviceAccount.automountServiceAccountToken }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.backend.podSecurityContext | nindent 8 }}
+      {{- if and .Values.migrations.enabled .Release.IsInstall }}
+      initContainers:
+        - name: wait-for-migrations
+          image: {{ include "meet.image" .Values.images.backend | quote }}
+          imagePullPolicy: {{ .Values.images.backend.pullPolicy }}
+          command: [/bin/sh, -ec]
+          args:
+            - |
+              attempt=1
+              until python manage.py migrate --check >/dev/null 2>&1; do
+                if [ "$attempt" -ge "$MAX_ATTEMPTS" ]; then
+                  echo "Migrations incomplètes après ${attempt} tentatives" >&2
+                  exit 1
+                fi
+                attempt=$((attempt + 1))
+                sleep "$RETRY_DELAY"
+              done
+          envFrom:
+            - configMapRef:
+                name: {{ include "meet.fullname" . }}-config
+          env:
+            {{- include "meet.secretEnv" . | nindent 12 }}
+            - name: MAX_ATTEMPTS
+              value: {{ .Values.migrations.retry.maxAttempts | quote }}
+            - name: RETRY_DELAY
+              value: {{ .Values.migrations.retry.delaySeconds | quote }}
+          resources:
+            {{- toYaml .Values.migrations.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.migrations.securityContext | nindent 12 }}
+      {{- end }}
+      containers:
+        - name: backend
+          image: {{ include "meet.image" .Values.images.backend | quote }}
+          imagePullPolicy: {{ .Values.images.backend.pullPolicy }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "meet.fullname" . }}-config
+          env:
+            {{- include "meet.secretEnv" . | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: 8000
+          {{- if .Values.backend.probes.startup.enabled }}
+          startupProbe:
+            httpGet:
+              path: {{ .Values.backend.probes.startup.path }}
+              port: http
+            {{- omit .Values.backend.probes.startup "enabled" "path" | toYaml | nindent 12 }}
+          {{- end }}
+          {{- if .Values.backend.probes.readiness.enabled }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.backend.probes.readiness.path }}
+              port: http
+            {{- omit .Values.backend.probes.readiness "enabled" "path" | toYaml | nindent 12 }}
+          {{- end }}
+          {{- if .Values.backend.probes.liveness.enabled }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.backend.probes.liveness.path }}
+              port: http
+            {{- omit .Values.backend.probes.liveness "enabled" "path" | toYaml | nindent 12 }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.backend.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.backend.securityContext | nindent 12 }}
+      {{- with .Values.backend.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.backend.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.backend.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "meet.fullname" . }}-frontend
+  labels:
+    {{- include "meet.labels" . | nindent 4 }}
+    app.kubernetes.io/component: frontend
+  {{- with .Values.frontend.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  selector:
+    {{- include "meet.selectorLabels" (dict "root" . "component" "frontend") | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.frontend.service.port }}
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "meet.fullname" . }}-frontend
+  labels:
+    {{- include "meet.labels" . | nindent 4 }}
+    app.kubernetes.io/component: frontend
+spec:
+  replicas: {{ .Values.frontend.replicas }}
+  selector:
+    matchLabels:
+      {{- include "meet.selectorLabels" (dict "root" . "component" "frontend") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "meet.selectorLabels" (dict "root" . "component" "frontend") | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      serviceAccountName: {{ include "meet.serviceAccountName" . }}
+      automountServiceAccountToken: {{ .Values.serviceAccount.automountServiceAccountToken }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.frontend.podSecurityContext | nindent 8 }}
+      containers:
+        - name: frontend
+          image: {{ include "meet.image" .Values.images.frontend | quote }}
+          imagePullPolicy: {{ .Values.images.frontend.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8080
+          {{- if .Values.frontend.probes.readiness.enabled }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.frontend.probes.readiness.path }}
+              port: http
+            {{- omit .Values.frontend.probes.readiness "enabled" "path" | toYaml | nindent 12 }}
+          {{- end }}
+          {{- if .Values.frontend.probes.liveness.enabled }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.frontend.probes.liveness.path }}
+              port: http
+            {{- omit .Values.frontend.probes.liveness "enabled" "path" | toYaml | nindent 12 }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.frontend.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.frontend.securityContext | nindent 12 }}
+          volumeMounts:
+            - name: runtime
+              mountPath: /tmp
+            - name: cache
+              mountPath: /var/cache/nginx
+            - name: run
+              mountPath: /var/run
+      volumes:
+        - name: runtime
+          emptyDir: {}
+        - name: cache
+          emptyDir: {}
+        - name: run
+          emptyDir: {}
+      {{- with .Values.frontend.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.frontend.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.frontend.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "meet.fullname" . }}-celery
+  labels:
+    {{- include "meet.labels" . | nindent 4 }}
+    app.kubernetes.io/component: celery
+spec:
+  replicas: {{ .Values.celery.replicas }}
+  selector:
+    matchLabels:
+      {{- include "meet.selectorLabels" (dict "root" . "component" "celery") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "meet.selectorLabels" (dict "root" . "component" "celery") | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/config.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ include "meet.serviceAccountName" . }}
+      automountServiceAccountToken: {{ .Values.serviceAccount.automountServiceAccountToken }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.celery.podSecurityContext | nindent 8 }}
+      {{- if and .Values.migrations.enabled .Release.IsInstall }}
+      initContainers:
+        - name: wait-for-migrations
+          image: {{ include "meet.image" .Values.images.backend | quote }}
+          imagePullPolicy: {{ .Values.images.backend.pullPolicy }}
+          command: [/bin/sh, -ec]
+          args:
+            - |
+              attempt=1
+              until python manage.py migrate --check >/dev/null 2>&1; do
+                if [ "$attempt" -ge "$MAX_ATTEMPTS" ]; then
+                  echo "Migrations incomplètes après ${attempt} tentatives" >&2
+                  exit 1
+                fi
+                attempt=$((attempt + 1))
+                sleep "$RETRY_DELAY"
+              done
+          envFrom:
+            - configMapRef:
+                name: {{ include "meet.fullname" . }}-config
+          env:
+            {{- include "meet.secretEnv" . | nindent 12 }}
+            - name: MAX_ATTEMPTS
+              value: {{ .Values.migrations.retry.maxAttempts | quote }}
+            - name: RETRY_DELAY
+              value: {{ .Values.migrations.retry.delaySeconds | quote }}
+          resources:
+            {{- toYaml .Values.migrations.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.migrations.securityContext | nindent 12 }}
+      {{- end }}
+      containers:
+        - name: celery
+          image: {{ include "meet.image" .Values.images.backend | quote }}
+          imagePullPolicy: {{ .Values.images.backend.pullPolicy }}
+          command:
+            - celery
+            - -A
+            - meet.celery_app
+            - worker
+            - --pool=solo
+            - --loglevel=info
+            - -Q
+            - meet-backend
+            - {{ printf "--concurrency=%v" .Values.celery.concurrency | quote }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "meet.fullname" . }}-config
+          env:
+            {{- include "meet.secretEnv" . | nindent 12 }}
+          {{- if .Values.celery.probes.liveness.enabled }}
+          livenessProbe:
+            exec:
+              command:
+                {{- toYaml .Values.celery.probes.liveness.command | nindent 16 }}
+            {{- omit .Values.celery.probes.liveness "enabled" "command" | toYaml | nindent 12 }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.celery.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.celery.securityContext | nindent 12 }}
+      {{- with .Values.celery.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.celery.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.celery.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

@@ -1,0 +1,22 @@
+Meet {{ .Chart.AppVersion }} est rendu pour https://{{ .Values.domain }}.
+
+Le Secret {{ include "meet.secretName" . | quote }} doit déjà exister dans le namespace
+{{ .Release.Namespace | quote }}. Ce chart ne crée aucun Secret.
+
+Les installations et mises à jour doivent utiliser :
+  --wait --wait-for-jobs --timeout 15m
+
+{{- if eq .Values.livekit.mode "embedded" }}
+LiveKit embarqué :
+- signalisation WebSocket/HTTPS : https://{{ .Values.livekit.host }}
+- média TCP : port {{ .Values.livekit.embedded.service.tcpPort }}
+- média UDP : port {{ .Values.livekit.embedded.service.udpPort }}
+
+Publiez les ports TCP/UDP du Service {{ include "meet.fullname" . }}-livekit et faites
+pointer le DNS de {{ .Values.livekit.host }} vers les points d'entrée appropriés.
+{{- else }}
+LiveKit externe : {{ .Values.livekit.external.endpoint }}
+{{- end }}
+
+Test après démarrage :
+  helm test {{ .Release.Name }} -n {{ .Release.Namespace }}

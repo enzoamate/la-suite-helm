@@ -1,0 +1,395 @@
+nameOverride: ""
+fullnameOverride: ""
+
+domain: meet.example.com
+existingSecret: meet-secrets
+imagePullSecrets: []
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+  automountServiceAccountToken: false
+
+podAnnotations: {}
+podLabels: {}
+
+images:
+  backend:
+    repository: lasuite/meet-backend
+    tag: "v1.36.3"
+    digest: ""
+    pullPolicy: IfNotPresent
+  frontend:
+    repository: lasuite/meet-frontend
+    tag: "v1.36.3"
+    digest: ""
+    pullPolicy: IfNotPresent
+
+secretKeys:
+  djangoSecretKey: DJANGO_SECRET_KEY
+  databasePassword: DB_PASSWORD
+  livekitApiKey: LIVEKIT_API_KEY
+  livekitApiSecret: LIVEKIT_API_SECRET
+  oidcClientSecret: OIDC_RP_CLIENT_SECRET
+  smtpPassword: DJANGO_EMAIL_HOST_PASSWORD
+  mediaAccessKey: AWS_S3_ACCESS_KEY_ID
+  mediaSecretKey: AWS_S3_SECRET_ACCESS_KEY
+  summaryApiToken: SUMMARY_SERVICE_API_TOKEN
+  summaryWebhookApiToken: SUMMARY_SERVICE_WEBHOOK_API_TOKEN
+
+application:
+  djangoConfiguration: Production
+  logLevel: INFO
+  allowUnregisteredRooms: true
+  extraEnv: {}
+
+backend:
+  replicas: 1
+  service:
+    port: 8000
+    annotations: {}
+  resources:
+    requests:
+      cpu: 100m
+      memory: 384Mi
+    limits:
+      memory: 1Gi
+  podSecurityContext:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: false
+    capabilities:
+      drop: [ALL]
+  probes:
+    startup:
+      enabled: true
+      path: /__lbheartbeat__
+      periodSeconds: 5
+      timeoutSeconds: 5
+      failureThreshold: 12
+    readiness:
+      enabled: true
+      path: /__heartbeat__
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 3
+    liveness:
+      enabled: true
+      path: /__lbheartbeat__
+      periodSeconds: 30
+      timeoutSeconds: 5
+      failureThreshold: 3
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+frontend:
+  replicas: 1
+  service:
+    port: 8080
+    annotations: {}
+  resources:
+    requests:
+      cpu: 20m
+      memory: 32Mi
+    limits:
+      memory: 256Mi
+  podSecurityContext:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop: [ALL]
+  probes:
+    readiness:
+      enabled: true
+      path: /
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 3
+    liveness:
+      enabled: true
+      path: /
+      initialDelaySeconds: 20
+      periodSeconds: 30
+      timeoutSeconds: 5
+      failureThreshold: 3
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+celery:
+  replicas: 1
+  concurrency: 1
+  probes:
+    liveness:
+      enabled: false
+      command: [sh, -c, "celery -A meet.celery_app inspect ping --timeout=5"]
+      initialDelaySeconds: 30
+      periodSeconds: 30
+      timeoutSeconds: 10
+      failureThreshold: 3
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 1Gi
+  podSecurityContext:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: false
+    capabilities:
+      drop: [ALL]
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+migrations:
+  enabled: true
+  backoffLimit: 6
+  activeDeadlineSeconds: 600
+  ttlSecondsAfterFinished: 300
+  retry:
+    maxAttempts: 90
+    delaySeconds: 2
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      memory: 512Mi
+  podSecurityContext:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: false
+    capabilities:
+      drop: [ALL]
+
+postgresql:
+  mode: embedded
+  database: meet
+  user: meet
+  port: 5432
+  external:
+    host: ""
+    database: meet
+    user: meet
+    port: 5432
+  embedded:
+    image:
+      repository: postgres
+      tag: "16-alpine"
+      digest: ""
+      pullPolicy: IfNotPresent
+    persistence:
+      enabled: true
+      storageClass: ""
+      accessModes: [ReadWriteOnce]
+      size: 10Gi
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        memory: 1Gi
+    podSecurityContext:
+      runAsNonRoot: true
+      runAsUser: 70
+      runAsGroup: 70
+      fsGroup: 70
+      seccompProfile:
+        type: RuntimeDefault
+    securityContext:
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: false
+      capabilities:
+        drop: [ALL]
+    probes:
+      readiness:
+        periodSeconds: 10
+        timeoutSeconds: 5
+        failureThreshold: 6
+      liveness:
+        initialDelaySeconds: 30
+        periodSeconds: 20
+        timeoutSeconds: 5
+        failureThreshold: 6
+
+redis:
+  mode: embedded
+  external:
+    url: ""
+    celeryBrokerUrl: ""
+  embedded:
+    image:
+      repository: redis
+      tag: "7.4-alpine"
+      digest: ""
+      pullPolicy: IfNotPresent
+    persistence:
+      enabled: true
+      storageClass: ""
+      accessModes: [ReadWriteOnce]
+      size: 2Gi
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        memory: 512Mi
+    podSecurityContext:
+      runAsNonRoot: true
+      runAsUser: 999
+      runAsGroup: 999
+      fsGroup: 999
+      seccompProfile:
+        type: RuntimeDefault
+    securityContext:
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: false
+      capabilities:
+        drop: [ALL]
+    probes:
+      readiness:
+        periodSeconds: 10
+        timeoutSeconds: 5
+        failureThreshold: 6
+      liveness:
+        initialDelaySeconds: 30
+        periodSeconds: 20
+        timeoutSeconds: 5
+        failureThreshold: 6
+
+livekit:
+  mode: embedded
+  host: livekit.example.com
+  external:
+    endpoint: ""
+  embedded:
+    image:
+      repository: livekit/livekit-server
+      tag: "v1.13.6"
+      digest: ""
+      pullPolicy: IfNotPresent
+    service:
+      type: LoadBalancer
+      annotations: {}
+      externalTrafficPolicy: Cluster
+      loadBalancerIP: ""
+      httpPort: 7880
+      tcpPort: 7881
+      udpPort: 7882
+    rtc:
+      useExternalIP: true
+      nodeIP: ""
+      enableLoopbackCandidate: false
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        memory: 1Gi
+    podSecurityContext:
+      runAsNonRoot: true
+      runAsUser: 10001
+      runAsGroup: 10001
+      fsGroup: 10001
+      seccompProfile:
+        type: RuntimeDefault
+    securityContext:
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
+      capabilities:
+        drop: [ALL]
+    probes:
+      readiness:
+        periodSeconds: 10
+        timeoutSeconds: 5
+        failureThreshold: 6
+      liveness:
+        initialDelaySeconds: 20
+        periodSeconds: 20
+        timeoutSeconds: 5
+        failureThreshold: 6
+    nodeSelector: {}
+    tolerations: []
+    affinity: {}
+
+oidc:
+  enabled: false
+  issuerUrl: ""
+  authorizationEndpoint: ""
+  tokenEndpoint: ""
+  userEndpoint: ""
+  jwksEndpoint: ""
+  logoutEndpoint: ""
+  clientId: ""
+  signAlgorithm: RS256
+  scopes: openid email
+  verifySSL: true
+  usePKCE: true
+  extraAuthParams: "{}"
+
+smtp:
+  enabled: false
+  host: ""
+  port: 587
+  username: ""
+  from: ""
+  useTLS: true
+  useSSL: false
+
+media:
+  enabled: false
+  endpoint: ""
+  publicEndpoint: ""
+  bucket: meet-media
+  region: us-east-1
+  signatureVersion: s3v4
+  fileUploadEnabled: false
+
+advanced:
+  recording:
+    enabled: false
+  transcription:
+    enabled: false
+    destination: ""
+  summary:
+    enabled: false
+    endpoint: ""
+    version: 2
+
+routing:
+  type: ingress
+  ingress:
+    className: ""
+    annotations: {}
+    tls:
+      enabled: true
+      secretName: ""
+      livekitSecretName: ""
+  gateway:
+    parentRefs: []
+    annotations: {}
+
+tests:
+  enabled: true
+  image:
+    repository: busybox
+    tag: "1.37"
+    digest: ""
+    pullPolicy: IfNotPresent

@@ -1,0 +1,312 @@
+{{- if .Values.redis.embedded.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "france-transfert.fullname" . }}-redis
+  labels:
+    {{- include "france-transfert.labels" . | nindent 4 }}
+    app.kubernetes.io/component: redis
+spec:
+  selector:
+    {{- include "france-transfert.selectorLabels" (dict "root" . "component" "redis") | nindent 4 }}
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: redis
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "france-transfert.fullname" . }}-redis
+  labels:
+    {{- include "france-transfert.labels" . | nindent 4 }}
+    app.kubernetes.io/component: redis
+spec:
+  serviceName: {{ include "france-transfert.fullname" . }}-redis
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "france-transfert.selectorLabels" (dict "root" . "component" "redis") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "france-transfert.selectorLabels" (dict "root" . "component" "redis") | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "france-transfert.serviceAccountName" . }}
+      automountServiceAccountToken: {{ .Values.serviceAccount.automountServiceAccountToken }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.redis.embedded.podSecurityContext | nindent 8 }}
+      containers:
+        - name: redis
+          image: {{ include "france-transfert.image" .Values.redis.embedded.image | quote }}
+          imagePullPolicy: {{ .Values.redis.embedded.image.pullPolicy }}
+          command:
+            - /bin/sh
+            - -ec
+          args:
+            - exec redis-server --appendonly yes --maxmemory-policy volatile-lru --requirepass "$METALOAD_PASSWORD"
+          env:
+            - name: METALOAD_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "france-transfert.secretName" . }}
+                  key: METALOAD_PASSWORD
+          ports:
+            - name: redis
+              containerPort: 6379
+          readinessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -ec
+                - redis-cli -a "$METALOAD_PASSWORD" ping | grep -q PONG
+            {{- toYaml .Values.redis.embedded.probes.readiness | nindent 12 }}
+          livenessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -ec
+                - redis-cli -a "$METALOAD_PASSWORD" ping | grep -q PONG
+            {{- toYaml .Values.redis.embedded.probes.liveness | nindent 12 }}
+          resources:
+            {{- toYaml .Values.redis.embedded.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.redis.embedded.securityContext | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        {{- if not .Values.redis.embedded.persistence.enabled }}
+        - name: data
+          emptyDir: {}
+        {{- end }}
+  {{- if .Values.redis.embedded.persistence.enabled }}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes:
+          {{- toYaml .Values.redis.embedded.persistence.accessModes | nindent 10 }}
+        {{- include "france-transfert.storageClass" .Values.redis.embedded.persistence.storageClass | nindent 8 }}
+        resources:
+          requests:
+            storage: {{ .Values.redis.embedded.persistence.size }}
+  {{- end }}
+{{- end }}
+{{- if .Values.s3.embedded.enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "france-transfert.fullname" . }}-s3
+  labels:
+    {{- include "france-transfert.labels" . | nindent 4 }}
+    app.kubernetes.io/component: s3
+spec:
+  selector:
+    {{- include "france-transfert.selectorLabels" (dict "root" . "component" "s3") | nindent 4 }}
+  ports:
+    - name: s3
+      port: 8000
+      targetPort: s3
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "france-transfert.fullname" . }}-s3
+  labels:
+    {{- include "france-transfert.labels" . | nindent 4 }}
+    app.kubernetes.io/component: s3
+spec:
+  serviceName: {{ include "france-transfert.fullname" . }}-s3
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "france-transfert.selectorLabels" (dict "root" . "component" "s3") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "france-transfert.selectorLabels" (dict "root" . "component" "s3") | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "france-transfert.serviceAccountName" . }}
+      automountServiceAccountToken: {{ .Values.serviceAccount.automountServiceAccountToken }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.s3.embedded.podSecurityContext | nindent 8 }}
+      initContainers:
+        - name: initialize-storage
+          image: {{ include "france-transfert.image" .Values.s3.embedded.initImage | quote }}
+          imagePullPolicy: {{ .Values.s3.embedded.initImage.pullPolicy }}
+          command:
+            - /bin/sh
+            - -ec
+          args:
+            - mkdir -p /storage/data /storage/metadata
+          securityContext:
+            {{- toYaml .Values.s3.embedded.initSecurityContext | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: /storage
+      containers:
+        - name: s3
+          image: {{ include "france-transfert.image" .Values.s3.embedded.image | quote }}
+          imagePullPolicy: {{ .Values.s3.embedded.image.pullPolicy }}
+          env:
+            - name: SCALITY_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "france-transfert.secretName" . }}
+                  key: STORAGE_ACCESS_KEY
+            - name: SCALITY_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "france-transfert.secretName" . }}
+                  key: STORAGE_SECRET_KEY
+            - name: S3DATA
+              value: file
+            - name: S3DATAPATH
+              value: /usr/src/app/storage/data
+            - name: S3METADATAPATH
+              value: /usr/src/app/storage/metadata
+            - name: ENDPOINT
+              value: {{ join "," (concat (list (printf "%s-s3" (include "france-transfert.fullname" .))) .Values.s3.embedded.endpointHostnames (ternary (list .Values.s3.expose.host) (list) .Values.s3.expose.enabled)) | quote }}
+            - name: REMOTE_MANAGEMENT_DISABLE
+              value: "1"
+          ports:
+            - name: s3
+              containerPort: 8000
+          startupProbe:
+            tcpSocket:
+              port: s3
+            {{- toYaml .Values.s3.embedded.probes.startup | nindent 12 }}
+          readinessProbe:
+            tcpSocket:
+              port: s3
+            {{- toYaml .Values.s3.embedded.probes.readiness | nindent 12 }}
+          livenessProbe:
+            tcpSocket:
+              port: s3
+            {{- toYaml .Values.s3.embedded.probes.liveness | nindent 12 }}
+          resources:
+            {{- toYaml .Values.s3.embedded.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.s3.embedded.securityContext | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: /usr/src/app/storage
+      {{- if not .Values.s3.embedded.persistence.enabled }}
+      volumes:
+        - name: data
+          emptyDir: {}
+      {{- end }}
+  {{- if .Values.s3.embedded.persistence.enabled }}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes:
+          {{- toYaml .Values.s3.embedded.persistence.accessModes | nindent 10 }}
+        {{- include "france-transfert.storageClass" .Values.s3.embedded.persistence.storageClass | nindent 8 }}
+        resources:
+          requests:
+            storage: {{ .Values.s3.embedded.persistence.size }}
+  {{- end }}
+{{- end }}
+{{- if .Values.clamav.embedded.enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "france-transfert.fullname" . }}-clamav
+  labels:
+    {{- include "france-transfert.labels" . | nindent 4 }}
+    app.kubernetes.io/component: clamav
+spec:
+  selector:
+    {{- include "france-transfert.selectorLabels" (dict "root" . "component" "clamav") | nindent 4 }}
+  ports:
+    - name: clamav
+      port: 3310
+      targetPort: clamav
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "france-transfert.fullname" . }}-clamav
+  labels:
+    {{- include "france-transfert.labels" . | nindent 4 }}
+    app.kubernetes.io/component: clamav
+spec:
+  serviceName: {{ include "france-transfert.fullname" . }}-clamav
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "france-transfert.selectorLabels" (dict "root" . "component" "clamav") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "france-transfert.selectorLabels" (dict "root" . "component" "clamav") | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "france-transfert.serviceAccountName" . }}
+      automountServiceAccountToken: {{ .Values.serviceAccount.automountServiceAccountToken }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.clamav.embedded.podSecurityContext | nindent 8 }}
+      containers:
+        - name: clamav
+          image: {{ include "france-transfert.image" .Values.clamav.embedded.image | quote }}
+          imagePullPolicy: {{ .Values.clamav.embedded.image.pullPolicy }}
+          ports:
+            - name: clamav
+              containerPort: 3310
+          startupProbe:
+            tcpSocket:
+              port: clamav
+            {{- toYaml .Values.clamav.embedded.probes.startup | nindent 12 }}
+          readinessProbe:
+            tcpSocket:
+              port: clamav
+            {{- toYaml .Values.clamav.embedded.probes.readiness | nindent 12 }}
+          livenessProbe:
+            tcpSocket:
+              port: clamav
+            {{- toYaml .Values.clamav.embedded.probes.liveness | nindent 12 }}
+          resources:
+            {{- toYaml .Values.clamav.embedded.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.clamav.embedded.securityContext | nindent 12 }}
+          volumeMounts:
+            - name: signatures
+              mountPath: /var/lib/clamav
+      {{- if not .Values.clamav.embedded.persistence.enabled }}
+      volumes:
+        - name: signatures
+          emptyDir: {}
+      {{- end }}
+  {{- if .Values.clamav.embedded.persistence.enabled }}
+  volumeClaimTemplates:
+    - metadata:
+        name: signatures
+      spec:
+        accessModes:
+          {{- toYaml .Values.clamav.embedded.persistence.accessModes | nindent 10 }}
+        {{- include "france-transfert.storageClass" .Values.clamav.embedded.persistence.storageClass | nindent 8 }}
+        resources:
+          requests:
+            storage: {{ .Values.clamav.embedded.persistence.size }}
+  {{- end }}
+{{- end }}

@@ -1,0 +1,24 @@
+La Suite Messages {{ .Chart.AppVersion }} a été déployée.
+
+URL : https://{{ .Values.host }}
+
+Le Secret {{ include "messages.secretName" . | quote }} doit déjà exister dans le namespace
+{{ .Release.Namespace | quote }}. Ce chart ne crée aucun Secret.
+
+Les installations et mises à jour doivent utiliser :
+  --wait --wait-for-jobs --timeout 15m
+
+La migration s'exécute avant une mise à jour et bloque la livraison en cas
+d'échec. Lors de la première installation, elle est suivie comme Job
+Kubernetes ordinaire et les workloads attendent la mise à jour du schéma.
+
+Test de connexion :
+  helm test {{ .Release.Name }} -n {{ .Release.Namespace }}
+
+{{- if .Values.mta.enabled }}
+Réception SMTP :
+  hôte : {{ .Values.mta.hostname }}
+  port : {{ .Values.mta.service.port }}
+{{- else }}
+Le MTA entrant est désactivé.
+{{- end }}

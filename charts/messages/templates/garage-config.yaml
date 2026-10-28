@@ -1,0 +1,24 @@
+{{- if eq .Values.s3.mode "embedded" }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "messages.fullname" . }}-garage
+  labels:
+    {{- include "messages.labels" . | nindent 4 }}
+    app.kubernetes.io/component: s3
+data:
+  garage.toml: |
+    metadata_dir = "/data/meta"
+    data_dir = "/data/data"
+    db_engine = "sqlite"
+    replication_factor = {{ .Values.s3.embedded.replicationFactor }}
+    rpc_bind_addr = "[::]:{{ .Values.s3.embedded.rpcPort }}"
+
+    [s3_api]
+    s3_region = {{ .Values.s3.region | quote }}
+    api_bind_addr = "[::]:{{ .Values.s3.embedded.s3Port }}"
+    root_domain = {{ .Values.s3.embedded.rootDomain | quote }}
+
+    [admin]
+    api_bind_addr = "[::]:{{ .Values.s3.embedded.adminPort }}"
+{{- end }}

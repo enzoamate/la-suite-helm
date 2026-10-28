@@ -1,0 +1,21 @@
+France Transfert a été déployé.
+
+URL : https://{{ .Values.host }}
+
+Secret attendu : {{ include "france-transfert.secretName" . }}
+Clés obligatoires :
+  - METALOAD_PASSWORD
+  - STORAGE_ACCESS_KEY
+  - STORAGE_SECRET_KEY
+  - PASSWORD_SALT
+  - SPRING_MAIL_USERNAME
+  - SPRING_MAIL_PASSWORD
+  - HEALTHCHECK_SMTP_USER
+  - HEALTHCHECK_SMTP_PASSWORD
+Clé conditionnelle :
+  - HEALTHCHECK_API_KEY si le point de contrôle privé est utilisé
+
+Le chart ne crée jamais ce Secret.
+
+Lancer le test de connexion :
+  helm test {{ .Release.Name }} -n {{ .Release.Namespace }}

@@ -1,0 +1,9 @@
+France Transfert
+Source : https://github.com/numerique-gouv/francetransfert
+Version adaptée : tag 4.0.20
+
+Ce chart contient des éléments de configuration adaptés du projet France
+Transfert, distribué sous licence Apache License 2.0.
+
+Les images de conteneurs référencées restent soumises à leurs licences
+respectives et ne sont pas redistribuées dans ce chart.

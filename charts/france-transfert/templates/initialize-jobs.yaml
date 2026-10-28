@@ -1,0 +1,178 @@
+{{- if and .Values.initialize.enabled .Values.initialize.s3.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "france-transfert.fullname" . }}-initialize-s3
+  labels:
+    {{- include "france-transfert.labels" . | nindent 4 }}
+    app.kubernetes.io/component: initialize-s3
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "10"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: {{ .Values.initialize.backoffLimit }}
+  activeDeadlineSeconds: {{ .Values.initialize.activeDeadlineSeconds }}
+  ttlSecondsAfterFinished: {{ .Values.initialize.ttlSecondsAfterFinished }}
+  template:
+    metadata:
+      labels:
+        {{- include "france-transfert.selectorLabels" (dict "root" . "component" "initialize-s3") | nindent 8 }}
+    spec:
+      restartPolicy: OnFailure
+      serviceAccountName: {{ include "france-transfert.initializeServiceAccountName" . }}
+      automountServiceAccountToken: false
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.initialize.s3PodSecurityContext | nindent 8 }}
+      containers:
+        - name: initialize-s3
+          image: {{ include "france-transfert.image" .Values.initialize.s3Image | quote }}
+          imagePullPolicy: {{ .Values.initialize.s3Image.pullPolicy }}
+          command:
+            - /bin/sh
+            - -ec
+          args:
+            - |
+              endpoint={{ include "france-transfert.s3Endpoint" . | quote }}
+              attempt=1
+              while ! aws --endpoint-url "$endpoint" \
+                --cli-connect-timeout "$S3_CONNECT_TIMEOUT" \
+                --cli-read-timeout "$S3_READ_TIMEOUT" \
+                s3api list-buckets >/dev/null 2>&1; do
+                if [ "$attempt" -ge "$MAX_ATTEMPTS" ]; then
+                  echo "S3 indisponible après ${attempt} tentatives" >&2
+                  exit 1
+                fi
+                attempt=$((attempt + 1))
+                sleep "$RETRY_DELAY"
+              done
+              for bucket in "$BUCKET_SEQUESTRE" "$BUCKET_EXPORT"; do
+                aws --endpoint-url "$endpoint" \
+                  --cli-connect-timeout "$S3_CONNECT_TIMEOUT" \
+                  --cli-read-timeout "$S3_READ_TIMEOUT" \
+                  s3api head-bucket --bucket "$bucket" >/dev/null 2>&1 ||
+                  aws --endpoint-url "$endpoint" \
+                    --cli-connect-timeout "$S3_CONNECT_TIMEOUT" \
+                    --cli-read-timeout "$S3_READ_TIMEOUT" \
+                    s3api create-bucket --bucket "$bucket"
+              done
+          env:
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "france-transfert.secretName" . }}
+                  key: STORAGE_ACCESS_KEY
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "france-transfert.secretName" . }}
+                  key: STORAGE_SECRET_KEY
+            - name: AWS_DEFAULT_REGION
+              value: {{ .Values.s3.region | quote }}
+            - name: AWS_EC2_METADATA_DISABLED
+              value: "true"
+            - name: AWS_MAX_ATTEMPTS
+              value: "3"
+            - name: MAX_ATTEMPTS
+              value: {{ .Values.initialize.retry.maxAttempts | quote }}
+            - name: RETRY_DELAY
+              value: {{ .Values.initialize.retry.delaySeconds | quote }}
+            - name: S3_CONNECT_TIMEOUT
+              value: {{ .Values.initialize.timeouts.s3ConnectSeconds | quote }}
+            - name: S3_READ_TIMEOUT
+              value: {{ .Values.initialize.timeouts.s3ReadSeconds | quote }}
+            - name: HOME
+              value: /tmp
+            - name: BUCKET_SEQUESTRE
+              value: {{ .Values.config.bucketSequestre | quote }}
+            - name: BUCKET_EXPORT
+              value: {{ .Values.config.bucketExport | quote }}
+          resources:
+            {{- toYaml .Values.initialize.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.initialize.securityContext | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: {{ .Values.initialize.tmp.sizeLimit }}
+{{- end }}
+{{- if and .Values.initialize.enabled .Values.initialize.redis.enabled }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "france-transfert.fullname" . }}-initialize-redis
+  labels:
+    {{- include "france-transfert.labels" . | nindent 4 }}
+    app.kubernetes.io/component: initialize-redis
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "10"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: {{ .Values.initialize.backoffLimit }}
+  activeDeadlineSeconds: {{ .Values.initialize.activeDeadlineSeconds }}
+  ttlSecondsAfterFinished: {{ .Values.initialize.ttlSecondsAfterFinished }}
+  template:
+    metadata:
+      labels:
+        {{- include "france-transfert.selectorLabels" (dict "root" . "component" "initialize-redis") | nindent 8 }}
+    spec:
+      restartPolicy: OnFailure
+      serviceAccountName: {{ include "france-transfert.initializeServiceAccountName" . }}
+      automountServiceAccountToken: false
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.initialize.redisPodSecurityContext | nindent 8 }}
+      containers:
+        - name: initialize-redis
+          image: {{ include "france-transfert.image" .Values.initialize.redisImage | quote }}
+          imagePullPolicy: {{ .Values.initialize.redisImage.pullPolicy }}
+          command:
+            - /bin/sh
+            - -ec
+          args:
+            - |
+              attempt=1
+              while ! redis-cli -h "$REDIS_HOST" -p "$REDIS_PORT" \
+                -t "$REDIS_TIMEOUT" -a "$METALOAD_PASSWORD" ping 2>/dev/null | grep -q PONG; do
+                if [ "$attempt" -ge "$MAX_ATTEMPTS" ]; then
+                  echo "Redis indisponible après ${attempt} tentatives" >&2
+                  exit 1
+                fi
+                attempt=$((attempt + 1))
+                sleep "$RETRY_DELAY"
+              done
+              redis-cli -h "$REDIS_HOST" -p "$REDIS_PORT" \
+                -t "$REDIS_TIMEOUT" -a "$METALOAD_PASSWORD" SETNX config '{}'
+          env:
+            - name: REDIS_HOST
+              value: {{ include "france-transfert.redisHost" . | quote }}
+            - name: REDIS_PORT
+              value: {{ ternary 6379 .Values.redis.external.port .Values.redis.embedded.enabled | quote }}
+            - name: MAX_ATTEMPTS
+              value: {{ .Values.initialize.retry.maxAttempts | quote }}
+            - name: RETRY_DELAY
+              value: {{ .Values.initialize.retry.delaySeconds | quote }}
+            - name: REDIS_TIMEOUT
+              value: {{ .Values.initialize.timeouts.redisSeconds | quote }}
+            - name: METALOAD_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "france-transfert.secretName" . }}
+                  key: METALOAD_PASSWORD
+          resources:
+            {{- toYaml .Values.initialize.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.initialize.securityContext | nindent 12 }}
+{{- end }}

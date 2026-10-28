@@ -39,7 +39,7 @@ jobs:
           GOBIN="$install_dir" go install github.com/zricethezav/gitleaks/v8@v8.24.2
           echo "$install_dir" >> "$GITHUB_PATH"
           sudo apt-get update
-          sudo apt-get install --yes --no-install-recommends skopeo
+          sudo apt-get install --yes --no-install-recommends ripgrep skopeo
 
       - name: Contrôler les contenus documentaires
         run: ./scripts/check-placeholders.sh

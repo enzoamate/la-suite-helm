@@ -42,6 +42,29 @@ Requises : `METALOAD_PASSWORD`, `STORAGE_ACCESS_KEY`,
 `HEALTHCHECK_API_KEY` est requise lorsque le point de contrôle privé est
 utilisé.
 
+### Docs
+
+`docs-secrets` fournit les identifiants Django, PostgreSQL, Redis, S3, OIDC,
+Yhub et le convertisseur. `docs-jwt-keys` contient les clés RSA
+`private.pem` et `yhub-private.pem`.
+
+### Fichiers
+
+`fichiers-secrets` fournit les identifiants Django, PostgreSQL, Redis, S3 et
+OIDC.
+
+### Grist
+
+`grist-secrets` contient au minimum `session-secret`, `database-password` et
+`oidc-client-secret`. Redis et S3 ajoutent les clés documentées dans le README.
+
+### Tchap
+
+`tchap-secrets` contient la clé Matrix durable `signing.key` et
+`secrets.yaml`, qui regroupe la connexion PostgreSQL, les secrets Synapse et la
+configuration OIDC sensible. La perte de la clé de signature casse la confiance
+de fédération du domaine.
+
 ## Exploitation
 
 - Accordez au mécanisme de livraison le minimum de droits nécessaire.

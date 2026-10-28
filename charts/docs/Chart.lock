@@ -1,0 +1,6 @@
+dependencies:
+- name: docs
+  repository: https://suitenumerique.github.io/docs/
+  version: 6.0.4
+digest: sha256:81128c179d9077df43a4dedcb975638756a9a7b3c5b386523c13e35fee82c00b
+generated: "2026-10-28T13:32:53.483924427+01:00"

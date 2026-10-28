@@ -1,0 +1,20 @@
+{{- if .Values.tests.enabled }}
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ include "grist.fullname" . }}-test
+  annotations:
+    helm.sh/hook: test
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  restartPolicy: Never
+  automountServiceAccountToken: false
+  containers:
+    - name: test
+      image: {{ include "grist.image" .Values.tests.image | quote }}
+      imagePullPolicy: {{ .Values.tests.image.pullPolicy }}
+      command: ["/bin/sh", "-ec", "wget -qO- http://{{ include "grist.fullname" . }}:{{ .Values.service.port }}/status"]
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities: {drop: [ALL]}
+{{- end }}

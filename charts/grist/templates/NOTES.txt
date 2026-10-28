@@ -1,0 +1,2 @@
+Grist : {{ .Values.config.publicUrl }}
+Le Secret {{ .Values.existingSecret }} doit exister avant le démarrage.

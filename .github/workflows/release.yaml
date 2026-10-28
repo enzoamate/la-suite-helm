@@ -47,7 +47,10 @@ jobs:
             echo "Tag SemVer invalide : ${GITHUB_REF_NAME}" >&2
             exit 1
           fi
-          for chart in charts/france-transfert charts/meet charts/messages; do
+          for chart in charts/*; do
+            [[ -f "$chart/Chart.yaml" ]] || continue
+            chart_type="$(helm show chart "$chart" | awk '$1 == "type:" { print $2 }')"
+            [[ "$chart_type" == "application" ]] || continue
             chart_version="$(helm show chart "$chart" | awk '$1 == "version:" { print $2 }')"
             if [[ "$chart_version" != "$version" ]]; then
               echo "${chart}: version ${chart_version}, tag ${version}" >&2
@@ -75,7 +78,10 @@ jobs:
         run: |
           set -Eeuo pipefail
           mkdir -p dist
-          for chart in charts/france-transfert charts/meet charts/messages; do
+          for chart in charts/*; do
+            [[ -f "$chart/Chart.yaml" ]] || continue
+            chart_type="$(helm show chart "$chart" | awk '$1 == "type:" { print $2 }')"
+            [[ "$chart_type" == "application" ]] || continue
             helm package "$chart" --destination dist
           done
           (

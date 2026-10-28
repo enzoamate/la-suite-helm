@@ -1,0 +1,46 @@
+upstream:
+  fullnameOverride: docs
+  image:
+    repository: lasuite/impress-backend
+    tag: "v6.0.4"
+    pullPolicy: IfNotPresent
+  backend:
+    replicas: 1
+    createsuperuser:
+      enabled: false
+  frontend:
+    replicas: 1
+    image:
+      repository: lasuite/impress-frontend
+      tag: "v6.0.4"
+      pullPolicy: IfNotPresent
+  yProvider:
+    replicas: 1
+    image:
+      repository: lasuite/impress-y-provider
+      tag: "v6.0.4"
+      pullPolicy: IfNotPresent
+  yhub:
+    replicas: 1
+    image:
+      repository: lasuite/impress-yhub
+      tag: "v6.0.4"
+      pullPolicy: IfNotPresent
+  jwtKeys:
+    enabled: true
+    existingSecret: docs-jwt-keys
+  ingress:
+    enabled: false
+  ingressCollaborationWS:
+    enabled: false
+  ingressCollaborationApi:
+    enabled: false
+  ingressAdmin:
+    enabled: false
+  ingressMedia:
+    enabled: false
+  posthog:
+    ingress:
+      enabled: false
+    ingressAssets:
+      enabled: false

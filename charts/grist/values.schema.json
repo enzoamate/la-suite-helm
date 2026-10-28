@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["image", "existingSecret", "config", "database", "oidc", "service", "ingress", "persistence"],
+  "properties": {
+    "nameOverride": {"type": "string"},
+    "fullnameOverride": {"type": "string"},
+    "image": {"type": "object", "required": ["repository", "tag", "pullPolicy"]},
+    "existingSecret": {"type": "string", "minLength": 1},
+    "secretKeys": {"type": "object"},
+    "config": {"type": "object", "required": ["publicUrl", "singleOrganization", "adminEmail"]},
+    "database": {"type": "object", "required": ["host", "port", "name", "user"]},
+    "redis": {"type": "object", "required": ["enabled"]},
+    "oidc": {"type": "object", "required": ["enabled", "issuer", "clientId", "scopes"]},
+    "objectStorage": {"type": "object", "required": ["enabled"]},
+    "replicaCount": {"type": "integer", "minimum": 1},
+    "service": {"type": "object"},
+    "ingress": {"type": "object"},
+    "persistence": {"type": "object"},
+    "resources": {"type": "object"},
+    "podAnnotations": {"type": "object"},
+    "nodeSelector": {"type": "object"},
+    "tolerations": {"type": "array"},
+    "affinity": {"type": "object"},
+    "podDisruptionBudget": {"type": "object"},
+    "tests": {"type": "object"}
+  }
+}

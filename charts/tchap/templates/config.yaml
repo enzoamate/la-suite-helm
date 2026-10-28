@@ -1,0 +1,44 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "tchap.fullname" . }}-synapse
+  labels: {{- include "tchap.labels" . | nindent 4 }}
+data:
+  homeserver.yaml: |
+    server_name: {{ .Values.synapse.serverName | quote }}
+    public_baseurl: {{ .Values.synapse.publicBaseUrl | quote }}
+    pid_file: /data/homeserver.pid
+    signing_key_path: /run/tchap/signing.key
+    media_store_path: /data/media_store
+    report_stats: {{ .Values.synapse.reportStats }}
+    max_upload_size: {{ .Values.synapse.maxUploadSize | quote }}
+    enable_registration: false
+    listeners:
+      - port: {{ .Values.synapse.service.port }}
+        tls: false
+        type: http
+        x_forwarded: true
+        resources:
+          - names:
+              - client
+              {{- if .Values.synapse.federation.enabled }}
+              - federation
+              {{- end }}
+            compress: false
+    {{- if .Values.synapse.federation.trustedKeyServers }}
+    trusted_key_servers:
+      {{- range .Values.synapse.federation.trustedKeyServers }}
+      - server_name: {{ . | quote }}
+      {{- end }}
+    {{- else }}
+    trusted_key_servers: []
+    {{- end }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "tchap.fullname" . }}-web
+  labels: {{- include "tchap.labels" . | nindent 4 }}
+data:
+  config.json: |
+    {{ toPrettyJson .Values.web.config | nindent 4 }}

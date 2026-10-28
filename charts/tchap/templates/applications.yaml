@@ -1,0 +1,149 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "tchap.fullname" . }}-synapse
+  labels: {{- include "tchap.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  selector:
+    matchLabels:
+      {{- include "tchap.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: synapse
+  template:
+    metadata:
+      labels:
+        {{- include "tchap.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: synapse
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/config.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 991
+        runAsGroup: 991
+        seccompProfile: {type: RuntimeDefault}
+        fsGroup: 991
+      containers:
+        - name: synapse
+          image: {{ include "tchap.image" .Values.synapse.image | quote }}
+          imagePullPolicy: {{ .Values.synapse.image.pullPolicy }}
+          command:
+            - python
+            - -m
+            - synapse.app.homeserver
+            - -c
+            - /run/tchap/homeserver.yaml
+            - -c
+            - /run/tchap/secrets.yaml
+          ports:
+            - name: http
+              containerPort: {{ .Values.synapse.service.port }}
+          volumeMounts:
+            - {name: config, mountPath: /run/tchap/homeserver.yaml, subPath: homeserver.yaml, readOnly: true}
+            - name: secrets
+              mountPath: /run/tchap/secrets.yaml
+              subPath: {{ .Values.synapse.secretKeys.configuration }}
+              readOnly: true
+            - name: secrets
+              mountPath: /run/tchap/signing.key
+              subPath: {{ .Values.synapse.secretKeys.signingKey }}
+              readOnly: true
+            - {name: data, mountPath: /data}
+          startupProbe:
+            httpGet: {path: /health, port: http}
+            periodSeconds: 5
+            failureThreshold: 60
+          livenessProbe:
+            httpGet: {path: /health, port: http}
+          readinessProbe:
+            httpGet: {path: /health, port: http}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: [ALL]}
+          resources: {{- toYaml .Values.synapse.resources | nindent 12 }}
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "tchap.fullname" . }}-synapse
+        - name: secrets
+          secret:
+            secretName: {{ .Values.synapse.existingSecret }}
+        - name: data
+          {{- if .Values.synapse.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ .Values.synapse.persistence.existingClaim | default (printf "%s-synapse" (include "tchap.fullname" .)) }}
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+      nodeSelector: {{- toYaml .Values.nodeSelector | nindent 8 }}
+      tolerations: {{- toYaml .Values.tolerations | nindent 8 }}
+      affinity: {{- toYaml .Values.affinity | nindent 8 }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "tchap.fullname" . }}-web
+  labels: {{- include "tchap.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.web.replicas }}
+  selector:
+    matchLabels:
+      {{- include "tchap.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: web
+  template:
+    metadata:
+      labels:
+        {{- include "tchap.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: web
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/config.yaml") . | sha256sum }}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: web
+          image: {{ include "tchap.image" .Values.web.image | quote }}
+          imagePullPolicy: {{ .Values.web.image.pullPolicy }}
+          ports:
+            - {name: http, containerPort: 80}
+          volumeMounts:
+            - {name: config, mountPath: /app/config.json, subPath: config.json, readOnly: true}
+          livenessProbe:
+            httpGet: {path: /, port: http}
+          readinessProbe:
+            httpGet: {path: /, port: http}
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            capabilities: {drop: [ALL]}
+          resources: {{- toYaml .Values.web.resources | nindent 12 }}
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "tchap.fullname" . }}-web
+      nodeSelector: {{- toYaml .Values.nodeSelector | nindent 8 }}
+      tolerations: {{- toYaml .Values.tolerations | nindent 8 }}
+      affinity: {{- toYaml .Values.affinity | nindent 8 }}
+{{- if and .Values.synapse.persistence.enabled (not .Values.synapse.persistence.existingClaim) }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "tchap.fullname" . }}-synapse
+  labels: {{- include "tchap.labels" . | nindent 4 }}
+spec:
+  accessModes: {{- toYaml .Values.synapse.persistence.accessModes | nindent 4 }}
+  {{- if .Values.synapse.persistence.storageClass }}
+  storageClassName: {{ .Values.synapse.persistence.storageClass }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.synapse.persistence.size }}
+{{- end }}

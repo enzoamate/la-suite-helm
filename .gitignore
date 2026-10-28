@@ -27,3 +27,5 @@ dist/
 *.tgz
 Chart.lock
 charts/*/charts/
+!charts/docs/Chart.lock
+!charts/fichiers/Chart.lock

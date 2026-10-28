@@ -1,0 +1,3 @@
+Docs a été rendu avec le chart officiel 6.0.4.
+Vérifiez que les Secrets {{ .Values.upstream.backend.envVars.DJANGO_SECRET_KEY.secretKeyRef.name | default "docs-secrets" }}
+et {{ .Values.upstream.jwtKeys.existingSecret }} existent avant le démarrage.

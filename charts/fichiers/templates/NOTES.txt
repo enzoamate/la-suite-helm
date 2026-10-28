@@ -1,0 +1,2 @@
+Fichiers a été rendu avec le chart officiel Drive 0.25.0.
+Créez le Secret fichiers-secrets avant le démarrage.

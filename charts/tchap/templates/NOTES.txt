@@ -1,0 +1,3 @@
+Tchap Web : https://{{ .Values.ingress.web.host }}
+Matrix : {{ .Values.synapse.publicBaseUrl }}
+Le Secret {{ .Values.synapse.existingSecret }} doit exister avant le démarrage.

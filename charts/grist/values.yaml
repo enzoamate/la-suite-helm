@@ -1,0 +1,83 @@
+nameOverride: ""
+fullnameOverride: ""
+
+image:
+  repository: gristlabs/grist
+  tag: "1.7.21"
+  digest: "sha256:577918affbc446f77382b6049c06226488a086a3ea52c2661154b1252d5ff873"
+  pullPolicy: IfNotPresent
+
+existingSecret: grist-secrets
+secretKeys:
+  session: session-secret
+  databasePassword: database-password
+  oidcClientSecret: oidc-client-secret
+  redisUrl: redis-url
+  s3AccessKey: s3-access-key
+  s3SecretKey: s3-secret-key
+
+config:
+  publicUrl: https://grist.example.com
+  singleOrganization: grist
+  forceLogin: true
+  adminEmail: admin@example.com
+  telemetryLevel: limited
+
+database:
+  host: postgres.example.com
+  port: 5432
+  name: grist
+  user: grist
+  ssl: true
+
+redis:
+  enabled: false
+
+oidc:
+  enabled: true
+  issuer: https://sso.example.com
+  clientId: grist
+  scopes: "openid profile email"
+  endSessionEndpoint: ""
+
+objectStorage:
+  enabled: false
+  endpoint: s3.example.com
+  port: 443
+  useTls: true
+  bucket: grist-docs
+  region: us-east-1
+
+replicaCount: 1
+service:
+  type: ClusterIP
+  port: 80
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  host: grist.example.com
+  tls:
+    enabled: true
+    secretName: ""
+persistence:
+  enabled: true
+  existingClaim: ""
+  storageClass: ""
+  accessModes: [ReadWriteOnce]
+  size: 20Gi
+resources: {}
+podAnnotations: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1
+tests:
+  enabled: true
+  image:
+    repository: busybox
+    tag: "1.37"
+    digest: ""
+    pullPolicy: IfNotPresent

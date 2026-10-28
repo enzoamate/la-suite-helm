@@ -26,8 +26,8 @@ helm upgrade --install meet charts/meet \
   --timeout 15m
 ```
 
-`--wait --wait-for-jobs --timeout` est obligatoire pour les trois charts :
-les migrations et initialisations doivent terminer avant que la livraison
+`--wait --wait-for-jobs --timeout` est obligatoire pour les charts qui
+exécutent des migrations ou initialisations : celles-ci doivent terminer avant que la livraison
 soit considérée réussie. Meet et Messages exécutent les migrations en
 pré-upgrade ; au premier déploiement, leurs Jobs ordinaires attendent les
 services nécessaires et les workloads applicatifs bloquent leur démarrage
@@ -59,6 +59,10 @@ dépendances et l’expiration des certificats.
 - Messages : PostgreSQL et buckets S3 ; documentez la reconstruction de Redis
   et OpenSearch.
 - France Transfert : stockage S3, Redis et volumes de travail nécessaires.
+- Docs : les deux bases PostgreSQL, Redis, bucket S3 et clés RSA.
+- Fichiers : PostgreSQL, Redis, bucket S3 et configuration WOPI.
+- Grist : PostgreSQL, volume `/persist` et bucket S3 lorsqu’il est activé.
+- Tchap : PostgreSQL, médias Matrix et clé de signature du domaine.
 
 Définissez des objectifs de perte de données et de reprise, conservez des
 copies isolées, puis testez régulièrement une restauration complète.

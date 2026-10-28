@@ -1,0 +1,11 @@
+apiVersion: v2
+name: grist
+description: Grist générique avec OIDC et services de données externes
+type: application
+version: 0.2.0
+appVersion: "1.7.21"
+home: https://github.com/gristlabs/grist-core
+sources:
+  - https://github.com/gristlabs/grist-core
+annotations:
+  artifacthub.io/license: Apache-2.0

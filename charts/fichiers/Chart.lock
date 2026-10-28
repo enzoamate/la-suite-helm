@@ -1,0 +1,6 @@
+dependencies:
+- name: drive
+  repository: https://suitenumerique.github.io/drive/
+  version: 0.25.0
+digest: sha256:10e99deff3c780aa19b01a84ba622e9ec728adf5971f99ed034a7e304cbba257
+generated: "2026-10-28T13:33:08.176938454+01:00"

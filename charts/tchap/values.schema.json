@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["synapse", "web", "ingress"],
+  "properties": {
+    "nameOverride": {"type": "string"},
+    "fullnameOverride": {"type": "string"},
+    "synapse": {
+      "type": "object",
+      "required": ["image", "serverName", "publicBaseUrl", "existingSecret", "secretKeys", "service", "persistence"]
+    },
+    "web": {"type": "object", "required": ["image", "config", "service"]},
+    "ingress": {"type": "object"},
+    "podAnnotations": {"type": "object"},
+    "nodeSelector": {"type": "object"},
+    "tolerations": {"type": "array"},
+    "affinity": {"type": "object"},
+    "tests": {"type": "object"}
+  }
+}

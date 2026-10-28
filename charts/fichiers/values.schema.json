@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["upstream"],
+  "properties": {
+    "upstream": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["image", "backend", "frontend"],
+      "properties": {
+        "image": {"type": "object"},
+        "backend": {"type": "object"},
+        "frontend": {"type": "object"}
+      }
+    }
+  }
+}

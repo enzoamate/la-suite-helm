@@ -1,0 +1,32 @@
+config:
+  publicUrl: https://grist.example.com
+  singleOrganization: equipe
+  adminEmail: admin@example.com
+  telemetryLevel: off
+database:
+  host: postgres.example.com
+  name: grist
+  user: grist
+  ssl: true
+redis:
+  enabled: true
+oidc:
+  issuer: https://sso.example.com
+  clientId: grist
+objectStorage:
+  enabled: true
+  endpoint: s3.example.com
+  port: 443
+  useTls: true
+  bucket: grist-docs
+ingress:
+  enabled: true
+  className: nginx
+  host: grist.example.com
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: 1g
+resources:
+  requests: {cpu: 500m, memory: 1Gi}
+  limits: {memory: 4Gi}
+podDisruptionBudget:
+  enabled: true

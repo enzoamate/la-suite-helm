@@ -1,0 +1,81 @@
+upstream:
+  backend:
+    envVars:
+      DJANGO_CONFIGURATION: Production
+      DJANGO_SETTINGS_MODULE: impress.settings
+      DJANGO_ALLOWED_HOSTS: docs.example.com
+      DJANGO_CSRF_TRUSTED_ORIGINS: https://docs.example.com
+      DJANGO_SECRET_KEY:
+        secretKeyRef: {name: docs-secrets, key: django-secret-key}
+      DB_HOST: postgres.example.com
+      DB_PORT: "5432"
+      DB_NAME: docs
+      DB_USER: docs
+      DB_PASSWORD:
+        secretKeyRef: {name: docs-secrets, key: database-password}
+      REDIS_URL:
+        secretKeyRef: {name: docs-secrets, key: redis-url}
+      DJANGO_CELERY_BROKER_URL:
+        secretKeyRef: {name: docs-secrets, key: celery-broker-url}
+      AWS_S3_ENDPOINT_URL: https://s3.example.com
+      AWS_STORAGE_BUCKET_NAME: docs-media
+      AWS_S3_ACCESS_KEY_ID:
+        secretKeyRef: {name: docs-secrets, key: s3-access-key}
+      AWS_S3_SECRET_ACCESS_KEY:
+        secretKeyRef: {name: docs-secrets, key: s3-secret-key}
+      OIDC_OP_JWKS_ENDPOINT: https://sso.example.com/oauth2/jwks
+      OIDC_OP_AUTHORIZATION_ENDPOINT: https://sso.example.com/oauth2/authorize
+      OIDC_OP_TOKEN_ENDPOINT: https://sso.example.com/oauth2/token
+      OIDC_OP_USER_ENDPOINT: https://sso.example.com/oauth2/userinfo
+      OIDC_OP_LOGOUT_ENDPOINT: https://sso.example.com/logout
+      OIDC_RP_CLIENT_ID: docs
+      OIDC_RP_CLIENT_SECRET:
+        secretKeyRef: {name: docs-secrets, key: oidc-client-secret}
+      OIDC_RP_SIGN_ALGO: RS256
+      OIDC_RP_SCOPES: "openid email profile"
+      LOGIN_REDIRECT_URL: https://docs.example.com
+      LOGIN_REDIRECT_URL_FAILURE: https://docs.example.com
+      LOGOUT_REDIRECT_URL: https://docs.example.com
+      YHUB_API_BASE_URL: http://docs-yhub:443
+      Y_PROVIDER_API_BASE_URL: http://docs-y-provider:443/api/
+      Y_PROVIDER_API_KEY:
+        secretKeyRef: {name: docs-secrets, key: y-provider-api-key}
+  yProvider:
+    envVars:
+      COLLABORATION_BACKEND_BASE_URL: https://docs.example.com
+      COLLABORATION_SERVER_ORIGIN: https://docs.example.com
+  yhub:
+    envVars:
+      POSTGRES:
+        secretKeyRef: {name: docs-secrets, key: yhub-postgres-url}
+      REDIS:
+        secretKeyRef: {name: docs-secrets, key: yhub-redis-url}
+      REDIS_PREFIX: docs-yhub
+      COLLABORATION_BACKEND_BASE_URL: https://docs.example.com
+      COLLABORATION_SERVER_ORIGIN: https://docs.example.com
+  ingress:
+    enabled: true
+    className: nginx
+    host: docs.example.com
+    annotations:
+      nginx.ingress.kubernetes.io/proxy-body-size: 100m
+  ingressCollaborationWS:
+    enabled: true
+    className: nginx
+    host: docs.example.com
+  ingressCollaborationApi:
+    enabled: true
+    className: nginx
+    host: docs.example.com
+  ingressMedia:
+    enabled: true
+    className: nginx
+    host: docs.example.com
+    annotations:
+      nginx.ingress.kubernetes.io/auth-url: https://docs.example.com/api/v1.0/documents/media-auth/
+      nginx.ingress.kubernetes.io/auth-response-headers: "Authorization, X-Amz-Date, X-Amz-Content-SHA256"
+      nginx.ingress.kubernetes.io/upstream-vhost: s3.example.com
+      nginx.ingress.kubernetes.io/rewrite-target: /docs-media/$1
+  serviceMedia:
+    host: s3.example.com
+    port: 443

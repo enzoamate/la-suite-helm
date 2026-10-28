@@ -1,0 +1,25 @@
+{{- if .Values.tests.enabled }}
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ include "tchap.fullname" . }}-test
+  annotations:
+    helm.sh/hook: test
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  restartPolicy: Never
+  automountServiceAccountToken: false
+  containers:
+    - name: test
+      image: {{ include "tchap.image" .Values.tests.image | quote }}
+      imagePullPolicy: {{ .Values.tests.image.pullPolicy }}
+      command:
+        - /bin/sh
+        - -ec
+        - |
+          wget -qO- http://{{ include "tchap.fullname" . }}-web:{{ .Values.web.service.port }}/ >/dev/null
+          wget -qO- http://{{ include "tchap.fullname" . }}-synapse:{{ .Values.synapse.service.port }}/health >/dev/null
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities: {drop: [ALL]}
+{{- end }}

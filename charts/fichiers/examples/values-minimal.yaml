@@ -1,0 +1,67 @@
+upstream:
+  backend:
+    envVars:
+      DJANGO_CONFIGURATION: Production
+      DJANGO_SETTINGS_MODULE: drive.settings
+      DJANGO_ALLOWED_HOSTS: fichiers.example.com
+      DJANGO_CSRF_TRUSTED_ORIGINS: https://fichiers.example.com
+      DJANGO_SECRET_KEY:
+        secretKeyRef: {name: fichiers-secrets, key: django-secret-key}
+      DB_HOST: postgres.example.com
+      DB_PORT: "5432"
+      DB_NAME: fichiers
+      DB_USER: fichiers
+      DB_PASSWORD:
+        secretKeyRef: {name: fichiers-secrets, key: database-password}
+      REDIS_URL:
+        secretKeyRef: {name: fichiers-secrets, key: redis-url}
+      DJANGO_CELERY_BROKER_URL:
+        secretKeyRef: {name: fichiers-secrets, key: celery-broker-url}
+      AWS_S3_ENDPOINT_URL: https://s3.example.com
+      AWS_STORAGE_BUCKET_NAME: fichiers-media
+      AWS_S3_ACCESS_KEY_ID:
+        secretKeyRef: {name: fichiers-secrets, key: s3-access-key}
+      AWS_S3_SECRET_ACCESS_KEY:
+        secretKeyRef: {name: fichiers-secrets, key: s3-secret-key}
+      AWS_S3_SIGNATURE_VERSION: s3v4
+      MEDIA_BASE_URL: https://fichiers.example.com
+      OIDC_OP_JWKS_ENDPOINT: https://sso.example.com/oauth2/jwks
+      OIDC_OP_AUTHORIZATION_ENDPOINT: https://sso.example.com/oauth2/authorize
+      OIDC_OP_TOKEN_ENDPOINT: https://sso.example.com/oauth2/token
+      OIDC_OP_USER_ENDPOINT: https://sso.example.com/oauth2/userinfo
+      OIDC_OP_LOGOUT_ENDPOINT: https://sso.example.com/logout
+      OIDC_RP_CLIENT_ID: fichiers
+      OIDC_RP_CLIENT_SECRET:
+        secretKeyRef: {name: fichiers-secrets, key: oidc-client-secret}
+      OIDC_RP_SIGN_ALGO: RS256
+      OIDC_RP_SCOPES: "openid email profile"
+      LOGIN_REDIRECT_URL: https://fichiers.example.com
+      LOGIN_REDIRECT_URL_FAILURE: https://fichiers.example.com
+      LOGOUT_REDIRECT_URL: https://fichiers.example.com
+  ingress:
+    enabled: true
+    className: nginx
+    host: fichiers.example.com
+    annotations:
+      nginx.ingress.kubernetes.io/proxy-body-size: 2g
+  ingressMedia:
+    enabled: true
+    className: nginx
+    host: fichiers.example.com
+    annotations:
+      nginx.ingress.kubernetes.io/auth-url: https://fichiers.example.com/api/v1.0/items/media-auth/
+      nginx.ingress.kubernetes.io/auth-response-headers: "Authorization, X-Amz-Date, X-Amz-Content-SHA256"
+      nginx.ingress.kubernetes.io/upstream-vhost: s3.example.com
+      nginx.ingress.kubernetes.io/rewrite-target: /fichiers-media/$1
+  ingressMediaPreview:
+    enabled: true
+    className: nginx
+    host: fichiers.example.com
+    annotations:
+      nginx.ingress.kubernetes.io/auth-url: https://fichiers.example.com/api/v1.0/items/media-auth/
+      nginx.ingress.kubernetes.io/auth-response-headers: "Authorization, X-Amz-Date, X-Amz-Content-SHA256"
+      nginx.ingress.kubernetes.io/upstream-vhost: s3.example.com
+      nginx.ingress.kubernetes.io/rewrite-target: /fichiers-media/$1
+  serviceMedia:
+    host: s3.example.com
+    port: 443

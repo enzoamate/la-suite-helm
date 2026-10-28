@@ -1,0 +1,16 @@
+apiVersion: v2
+name: fichiers
+description: Déploiement générique de Fichiers (La Suite Drive)
+type: application
+version: 0.2.0
+appVersion: "0.25.0"
+home: https://github.com/suitenumerique/drive
+sources:
+  - https://github.com/suitenumerique/drive
+dependencies:
+  - name: drive
+    alias: upstream
+    version: 0.25.0
+    repository: https://suitenumerique.github.io/drive/
+annotations:
+  artifacthub.io/license: MIT

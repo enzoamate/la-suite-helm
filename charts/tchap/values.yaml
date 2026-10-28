@@ -1,0 +1,72 @@
+nameOverride: ""
+fullnameOverride: ""
+
+synapse:
+  image:
+    repository: ghcr.io/tchapgouv/synapse
+    tag: "tchap-v1.161.0-0.0.1"
+    digest: "sha256:e1dce9ad93a07b5e55a2e0c1e99ee89b9e3e6b31f1a91c70727a330c21fa475a"
+    pullPolicy: IfNotPresent
+  serverName: example.com
+  publicBaseUrl: https://matrix.example.com/
+  reportStats: false
+  federation:
+    enabled: false
+    trustedKeyServers: []
+  existingSecret: tchap-secrets
+  secretKeys:
+    configuration: secrets.yaml
+    signingKey: signing.key
+  maxUploadSize: 100M
+  service:
+    port: 8008
+  persistence:
+    enabled: true
+    existingClaim: ""
+    storageClass: ""
+    accessModes: [ReadWriteOnce]
+    size: 50Gi
+  resources: {}
+
+web:
+  image:
+    repository: ghcr.io/tchapgouv/tchap-web-v4
+    tag: "tchap-4.21.10"
+    digest: "sha256:9d6b165ee3ffff4e79dfe541c3d5963bb1a1d5288022877f585a3d4b196996bc"
+    pullPolicy: IfNotPresent
+  replicas: 1
+  service:
+    port: 80
+  config:
+    default_server_config:
+      m.homeserver:
+        base_url: https://matrix.example.com
+        server_name: example.com
+    disable_custom_urls: true
+    disable_guests: true
+    brand: Tchap
+  resources: {}
+
+ingress:
+  className: ""
+  annotations: {}
+  web:
+    enabled: false
+    host: tchap.example.com
+    tls: {enabled: true, secretName: ""}
+  matrix:
+    enabled: false
+    host: matrix.example.com
+    tls: {enabled: true, secretName: ""}
+
+podAnnotations: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}
+tests:
+  enabled: true
+  image:
+    repository: busybox
+    tag: "1.37"
+    digest: ""
+    pullPolicy: IfNotPresent

@@ -33,6 +33,10 @@ for chart in "$ROOT_DIR"/charts/*; do
   [[ -f "$chart/Chart.yaml" ]] || continue
   chart_name="$(basename "$chart")"
 
+  if [[ -f "$chart/Chart.lock" ]]; then
+    helm dependency build --skip-refresh "$chart"
+  fi
+
   for values in "$chart"/examples/*.yaml; do
     [[ -f "$values" ]] || continue
     profile_name="$(basename "$values" .yaml)"

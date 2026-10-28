@@ -1,0 +1,172 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "grist.fullname" . }}
+  labels: {{- include "grist.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels: {{- include "grist.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "grist.selectorLabels" . | nindent 8 }}
+      annotations: {{- toYaml .Values.podAnnotations | nindent 8 }}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 1001
+        seccompProfile: {type: RuntimeDefault}
+        fsGroup: 1001
+      containers:
+        - name: grist
+          image: {{ include "grist.image" .Values.image | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - {name: http, containerPort: 8484}
+          env:
+            - name: APP_HOME_URL
+              value: {{ .Values.config.publicUrl | quote }}
+            - name: GRIST_SINGLE_ORG
+              value: {{ .Values.config.singleOrganization | quote }}
+            - name: GRIST_FORCE_LOGIN
+              value: {{ .Values.config.forceLogin | quote }}
+            - name: GRIST_ADMIN_EMAIL
+              value: {{ .Values.config.adminEmail | quote }}
+            - name: GRIST_TELEMETRY_LEVEL
+              value: {{ .Values.config.telemetryLevel | quote }}
+            - {name: TYPEORM_TYPE, value: postgres}
+            - name: TYPEORM_HOST
+              value: {{ .Values.database.host | quote }}
+            - name: TYPEORM_PORT
+              value: {{ .Values.database.port | quote }}
+            - name: TYPEORM_DATABASE
+              value: {{ .Values.database.name | quote }}
+            - name: TYPEORM_USERNAME
+              value: {{ .Values.database.user | quote }}
+            - name: TYPEORM_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.existingSecret }}
+                  key: {{ .Values.secretKeys.databasePassword }}
+            - name: GRIST_SESSION_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.existingSecret }}
+                  key: {{ .Values.secretKeys.session }}
+            {{- if .Values.database.ssl }}
+            - {name: TYPEORM_EXTRA, value: '{"ssl":{"rejectUnauthorized":true}}'}
+            {{- end }}
+            {{- if .Values.redis.enabled }}
+            - name: REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.existingSecret }}
+                  key: {{ .Values.secretKeys.redisUrl }}
+            {{- end }}
+            {{- if .Values.oidc.enabled }}
+            - name: GRIST_OIDC_SP_HOST
+              value: {{ .Values.config.publicUrl | quote }}
+            - name: GRIST_OIDC_IDP_ISSUER
+              value: {{ .Values.oidc.issuer | quote }}
+            - name: GRIST_OIDC_IDP_CLIENT_ID
+              value: {{ .Values.oidc.clientId | quote }}
+            - name: GRIST_OIDC_IDP_SCOPES
+              value: {{ .Values.oidc.scopes | quote }}
+            - name: GRIST_OIDC_IDP_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.existingSecret }}
+                  key: {{ .Values.secretKeys.oidcClientSecret }}
+            {{- if .Values.oidc.endSessionEndpoint }}
+            - name: GRIST_OIDC_IDP_END_SESSION_ENDPOINT
+              value: {{ .Values.oidc.endSessionEndpoint | quote }}
+            {{- else }}
+            - {name: GRIST_OIDC_IDP_SKIP_END_SESSION_ENDPOINT, value: "true"}
+            {{- end }}
+            {{- end }}
+            {{- if .Values.objectStorage.enabled }}
+            - name: GRIST_DOCS_MINIO_ENDPOINT
+              value: {{ .Values.objectStorage.endpoint | quote }}
+            - name: GRIST_DOCS_MINIO_PORT
+              value: {{ .Values.objectStorage.port | quote }}
+            - name: GRIST_DOCS_MINIO_USE_SSL
+              value: {{ ternary "1" "0" .Values.objectStorage.useTls | quote }}
+            - name: GRIST_DOCS_MINIO_BUCKET
+              value: {{ .Values.objectStorage.bucket | quote }}
+            - name: GRIST_DOCS_MINIO_BUCKET_REGION
+              value: {{ .Values.objectStorage.region | quote }}
+            - name: GRIST_DOCS_MINIO_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.existingSecret }}
+                  key: {{ .Values.secretKeys.s3AccessKey }}
+            - name: GRIST_DOCS_MINIO_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.existingSecret }}
+                  key: {{ .Values.secretKeys.s3SecretKey }}
+            {{- end }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: [ALL]}
+          volumeMounts:
+            - {name: data, mountPath: /persist}
+          startupProbe:
+            httpGet:
+              path: /status
+              port: http
+            periodSeconds: 5
+            failureThreshold: 30
+          livenessProbe:
+            httpGet:
+              path: /status
+              port: http
+          readinessProbe:
+            httpGet:
+              path: "/status?ready=1"
+              port: http
+          resources: {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: data
+          {{- if .Values.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ .Values.persistence.existingClaim | default (include "grist.fullname" .) }}
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+      nodeSelector: {{- toYaml .Values.nodeSelector | nindent 8 }}
+      tolerations: {{- toYaml .Values.tolerations | nindent 8 }}
+      affinity: {{- toYaml .Values.affinity | nindent 8 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "grist.fullname" . }}
+  labels: {{- include "grist.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  selector: {{- include "grist.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.service.port }}
+      targetPort: http
+{{- if and .Values.persistence.enabled (not .Values.persistence.existingClaim) }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "grist.fullname" . }}
+  labels: {{- include "grist.labels" . | nindent 4 }}
+spec:
+  accessModes: {{- toYaml .Values.persistence.accessModes | nindent 4 }}
+  {{- if .Values.persistence.storageClass }}
+  storageClassName: {{ .Values.persistence.storageClass }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.persistence.size }}
+{{- end }}

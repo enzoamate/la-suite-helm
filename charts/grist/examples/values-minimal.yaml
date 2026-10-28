@@ -1,0 +1,15 @@
+config:
+  publicUrl: https://grist.example.com
+  singleOrganization: equipe
+  adminEmail: admin@example.com
+database:
+  host: postgres.example.com
+  name: grist
+  user: grist
+oidc:
+  issuer: https://sso.example.com
+  clientId: grist
+ingress:
+  enabled: true
+  className: nginx
+  host: grist.example.com

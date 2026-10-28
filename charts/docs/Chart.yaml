@@ -1,0 +1,16 @@
+apiVersion: v2
+name: docs
+description: Déploiement générique de Docs de La Suite numérique
+type: application
+version: 0.2.0
+appVersion: "6.0.4"
+home: https://github.com/suitenumerique/docs
+sources:
+  - https://github.com/suitenumerique/docs
+dependencies:
+  - name: docs
+    alias: upstream
+    version: 6.0.4
+    repository: https://suitenumerique.github.io/docs/
+annotations:
+  artifacthub.io/license: MIT

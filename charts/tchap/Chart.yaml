@@ -1,0 +1,10 @@
+apiVersion: v2
+name: tchap
+description: Tchap Web et homeserver Matrix monodomaine générique
+type: application
+version: 0.2.0
+appVersion: "4.21.10"
+home: https://github.com/tchapgouv/tchap-web-v4
+sources:
+  - https://github.com/tchapgouv/tchap-web-v4
+  - https://github.com/tchapgouv/synapse
